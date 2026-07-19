@@ -224,3 +224,105 @@ export function decodePaymentFulfilledEvents(
     authVersion: log.args.authVersion,
   }));
 }
+
+// ---------------------------------------------------------------------------
+// Event location (receipt verification without a tx hash, blueprint §14)
+// ---------------------------------------------------------------------------
+
+/**
+ * The public Monad RPC caps eth_getLogs at a 100-block range, and the chain is
+ * tens of millions of blocks deep — a full-history scan is impossible. The
+ * contract writes settlement.paidAt = block.timestamp, so the settlement
+ * block is located by binary-searching block timestamps for paidAt, then
+ * scanning forward in ≤100-block chunks. Deterministic; works on any RPC
+ * regardless of log-range limits. (Ported from event-locator.reference.ts.)
+ */
+const LOG_CHUNK = 100n;
+const MAX_LOG_CHUNKS = 6n;
+/** Stop scanning once we are this many seconds past the settlement second. */
+const TIMESTAMP_EXIT_MARGIN = 64n;
+
+export interface LocatedPaymentFulfilled {
+  txHash: Hex;
+  blockNumber: bigint;
+  event: PaymentFulfilledEvent;
+}
+
+const paymentFulfilledEvent = VAJRA_ABI.find(
+  (entry): entry is Extract<(typeof VAJRA_ABI)[number], { type: 'event'; name: 'PaymentFulfilled' }> =>
+    entry.type === 'event' && entry.name === 'PaymentFulfilled',
+);
+
+/**
+ * Locates the PaymentFulfilled event for a request whose settlement timestamp
+ * (settlementOf(requestId).paidAt) is known. Returns null when no matching
+ * event exists within the scan window — the caller cross-checks against the
+ * settlement record and treats absence as incomplete verification, never as
+ * proof of non-payment. Throws on RPC failure (callers classify).
+ */
+export async function locatePaymentFulfilledEvent(
+  client: PublicClient,
+  requestId: Hex,
+  paidAt: bigint,
+  config: VajraChainConfig = getChainConfig(),
+): Promise<LocatedPaymentFulfilled | null> {
+  if (!paymentFulfilledEvent) return null;
+
+  // 1. Binary-search block timestamps for the first block of the settlement second.
+  const latest = await client.getBlockNumber();
+  let lo = 0n;
+  let hi = latest;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1n;
+    const block = await client.getBlock({ blockNumber: mid, includeTransactions: false });
+    if (block.timestamp >= paidAt) hi = mid;
+    else lo = mid + 1n;
+  }
+
+  // 2. Scan forward in ≤100-block chunks until the matching event appears.
+  const id = requestId.toLowerCase();
+  for (let chunk = 0n; chunk < MAX_LOG_CHUNKS && lo <= latest; chunk++) {
+    const fromBlock = lo + chunk * LOG_CHUNK;
+    const toBlock = fromBlock + (LOG_CHUNK - 1n) > latest ? latest : fromBlock + (LOG_CHUNK - 1n);
+    const logs = await client.getLogs({
+      address: vajraAddress(config),
+      event: paymentFulfilledEvent,
+      args: { requestId },
+      fromBlock,
+      toBlock,
+    });
+    const match = logs.find((l) => l.args.requestId?.toLowerCase() === id);
+    if (match) {
+      const a = match.args;
+      if (
+        a.payer !== undefined &&
+        a.recipient !== undefined &&
+        a.amount !== undefined &&
+        a.paidAt !== undefined &&
+        a.memoHash !== undefined &&
+        a.authMode !== undefined &&
+        a.authVersion !== undefined
+      ) {
+        return {
+          txHash: match.transactionHash,
+          blockNumber: match.blockNumber,
+          event: {
+            requestId: a.requestId ?? requestId,
+            payer: a.payer,
+            recipient: a.recipient,
+            amount: a.amount,
+            paidAt: a.paidAt,
+            memoHash: a.memoHash,
+            authMode: a.authMode as AuthMode,
+            authVersion: a.authVersion,
+          },
+        };
+      }
+      return null;
+    }
+    // Early exit once we are well past the settlement second.
+    const probe = await client.getBlock({ blockNumber: toBlock, includeTransactions: false });
+    if (probe.timestamp > paidAt + TIMESTAMP_EXIT_MARGIN) break;
+  }
+  return null;
+}
