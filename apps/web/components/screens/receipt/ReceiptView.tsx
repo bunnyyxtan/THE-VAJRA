@@ -23,15 +23,10 @@ import { classifyError } from "@/lib/errors";
 import { REQUEST_STATUS, type Settlement } from "@/lib/vajra/types";
 import type { Hex } from "viem";
 
-import { Button } from "@/components/ui/Button";
-import { LedgerBlock, LedgerRow } from "@/components/ui/Ledger";
-import { ProofChain, PROOF_CHAIN_STAGES, type ProofStage } from "@/components/ui/ProofChain";
-import { Seal } from "@/components/ui/Seal";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { CopyButton } from "@/components/ui/CopyButton";
-import { Banner } from "@/components/ui/Banner";
+import { Button, LedgerBlock, LedgerRow, ProofChain, Seal, Skeleton, Banner } from "@/components/ui";
 
 import { getVajraPublicClient } from "../public-client";
+import { buildProofStages } from "../proof-stages";
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                       */
@@ -358,10 +353,11 @@ export function ReceiptView({ requestId }: { requestId: string }) {
     return () => cancelAnimationFrame(raf);
   }, [confirmed, chainComplete]);
 
-  const stages: ProofStage[] = PROOF_CHAIN_STAGES.map((label) => ({
-    label,
-    status: chainComplete ? "complete" : "upcoming",
-  }));
+  const stages = buildProofStages(
+    chainComplete
+      ? ["done", "done", "done", "done", "done", "done", "done"]
+      : ["pending", "pending", "pending", "pending", "pending", "pending", "pending"],
+  );
 
   /* Share = copy this receipt URL. Real clipboard write, check morph, AT note. */
   const [shareState, setShareState] = useState<"idle" | "copied" | "error">("idle");
@@ -426,7 +422,7 @@ export function ReceiptView({ requestId }: { requestId: string }) {
                 label="Request ID"
                 value={<span className="sc-break">{id}</span>}
                 mono
-                aside={<CopyButton text={id} />}
+                copyValue={id}
               />
             </LedgerBlock>
             <p className="sc-note">
@@ -441,7 +437,7 @@ export function ReceiptView({ requestId }: { requestId: string }) {
               </span>
             </p>
             <div className="receipt-actions">
-              <Button onClick={reverify} loading={refreshing} loadingText="Re-verifying on Monad">
+              <Button onClick={reverify} loading={refreshing} loadingLabel="Re-verifying on Monad">
                 Retry verification
               </Button>
             </div>
@@ -450,7 +446,7 @@ export function ReceiptView({ requestId }: { requestId: string }) {
           <section className="receipt-empty">
             <h2 className="receipt-empty__title">No settlement found for this request</h2>
             {revoked ? (
-              <Banner tone="warning" title="Request revoked">
+              <Banner variant="warning" title="Request revoked">
                 The recipient revoked this request before it was paid. No settlement exists
                 and none can be created from it.
               </Banner>
@@ -466,7 +462,7 @@ export function ReceiptView({ requestId }: { requestId: string }) {
                 label="Request ID"
                 value={<span className="sc-break">{id}</span>}
                 mono
-                aside={<CopyButton text={id} />}
+                copyValue={id}
               />
             </LedgerBlock>
             <h3 className="receipt-empty__subtitle">How to verify independently</h3>
@@ -492,7 +488,7 @@ export function ReceiptView({ requestId }: { requestId: string }) {
         ) : confirmed && settlement ? (
           <>
             {(stateSoftError || eventSoftError) && (
-              <Banner tone="warning" title="Re-verification incomplete">
+              <Banner variant="warning" title="Re-verification incomplete">
                 {stateSoftError ?? eventSoftError} The evidence below is from the earlier
                 successful read and remains labeled with its verification time.
               </Banner>
@@ -508,29 +504,36 @@ export function ReceiptView({ requestId }: { requestId: string }) {
             </div>
 
             <div className="receipt-reveal receipt-sealrow">
-              <Seal
-                title="Receipt sealed"
-                sub="VajraNativeV1 · Monad Mainnet · chain 143"
-                size={40}
-              />
+              <Seal size={48} />
+              <span className="receipt-sealrow__meta">
+                <span className="receipt-sealrow__title">Receipt sealed</span>
+                <span className="receipt-sealrow__sub">
+                  VajraNativeV1 · Monad Mainnet · chain 143
+                </span>
+              </span>
             </div>
 
             <div className="receipt-reveal receipt-reveal--1">
               <LedgerBlock
                 title="Settlement record"
-                freshness={`Verified from Monad Mainnet state at ${timeFmt.format(new Date(verifiedAt))}`}
+                actions={
+                  <span className="vscreen__freshness">
+                    Verified from Monad Mainnet state at{" "}
+                    {timeFmt.format(new Date(verifiedAt))}
+                  </span>
+                }
               >
                 <LedgerRow
                   label="Payer"
                   value={<span className="sc-break">{settlement.payer}</span>}
                   mono
-                  aside={<CopyButton text={settlement.payer} />}
+                  copyValue={settlement.payer}
                 />
                 <LedgerRow
                   label="Recipient"
                   value={<span className="sc-break">{settlement.recipient}</span>}
                   mono
-                  aside={<CopyButton text={settlement.recipient} />}
+                  copyValue={settlement.recipient}
                 />
                 <LedgerRow
                   label="Amount"
@@ -544,19 +547,19 @@ export function ReceiptView({ requestId }: { requestId: string }) {
                   label="Amount (wei)"
                   value={<span className="sc-break">{settlement.amount.toString()}</span>}
                   mono
-                  aside={<CopyButton text={settlement.amount.toString()} />}
+                  copyValue={settlement.amount.toString()}
                 />
                 <LedgerRow
                   label="Request ID"
                   value={<span className="sc-break">{id}</span>}
                   mono
-                  aside={<CopyButton text={id} />}
+                  copyValue={id}
                 />
                 <LedgerRow
                   label="Memo hash"
                   value={<span className="sc-break">{settlement.memoHash}</span>}
                   mono
-                  aside={<CopyButton text={settlement.memoHash} />}
+                  copyValue={settlement.memoHash}
                 />
                 <LedgerRow
                   label="Authorization"
@@ -568,39 +571,38 @@ export function ReceiptView({ requestId }: { requestId: string }) {
                 />
                 <LedgerRow
                   label="Transaction"
-                  value={
-                    eventLog ? (
-                      <span className="sc-break">{eventLog.txHash}</span>
-                    ) : eventCheck.phase === "loading" ? (
-                      <Skeleton variant="text" width={240} label="Event verification pending" />
-                    ) : (
-                      "Verification pending"
-                    )
-                  }
                   mono={!!eventLog}
-                  aside={
-                    eventLog ? (
-                      <>
-                        <CopyButton text={eventLog.txHash} />
-                        <a
-                          href={explorerTxUrl(eventLog.txHash, config)}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ fontSize: "var(--sc-type-compact)", fontWeight: 600 }}
-                        >
-                          Monadscan
-                        </a>
-                      </>
-                    ) : eventCheck.phase === "error" ? (
-                      <Button
-                        variant="ghost"
-                        onClick={() => void runEventCheck(settlement.paidAt)}
+                  copyValue={eventLog ? eventLog.txHash : undefined}
+                >
+                  {eventLog ? (
+                    <>
+                      <span className="sc-break">{eventLog.txHash}</span>{" "}
+                      <a
+                        href={explorerTxUrl(eventLog.txHash, config)}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ fontSize: "var(--sc-type-compact)", fontWeight: 600 }}
                       >
-                        Retry
-                      </Button>
-                    ) : undefined
-                  }
-                />
+                        Monadscan
+                      </a>
+                    </>
+                  ) : eventCheck.phase === "loading" ? (
+                    <Skeleton width={240} />
+                  ) : (
+                    <>
+                      Verification pending{" "}
+                      {eventCheck.phase === "error" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void runEventCheck(settlement.paidAt)}
+                        >
+                          Retry
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </LedgerRow>
                 <LedgerRow
                   label="Block"
                   value={
@@ -609,7 +611,7 @@ export function ReceiptView({ requestId }: { requestId: string }) {
                         {Number(eventLog.blockNumber).toLocaleString("en-US")}
                       </span>
                     ) : eventCheck.phase === "loading" ? (
-                      <Skeleton variant="text" width={96} label="Block number pending" />
+                      <Skeleton width={96} />
                     ) : (
                       "Verification pending"
                     )
@@ -625,22 +627,19 @@ export function ReceiptView({ requestId }: { requestId: string }) {
                 />
                 <LedgerRow
                   label="Contract"
-                  value={<span className="sc-break">{config.contractAddress}</span>}
                   mono
-                  aside={
-                    <>
-                      <CopyButton text={config.contractAddress} />
-                      <a
-                        href={contractExplorerUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ fontSize: "var(--sc-type-compact)", fontWeight: 600 }}
-                      >
-                        Monadscan
-                      </a>
-                    </>
-                  }
-                />
+                  copyValue={config.contractAddress}
+                >
+                  <span className="sc-break">{config.contractAddress}</span>{" "}
+                  <a
+                    href={contractExplorerUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: "var(--sc-type-compact)", fontWeight: 600 }}
+                  >
+                    Monadscan
+                  </a>
+                </LedgerRow>
               </LedgerBlock>
             </div>
 
@@ -678,13 +677,12 @@ export function ReceiptView({ requestId }: { requestId: string }) {
             )}
 
             <div className="receipt-reveal receipt-reveal--2 receipt-actions receipt-no-print">
-              <Button
-                variant="secondary"
-                onClick={shareReceipt}
-                success={shareState === "copied"}
-                successText="Link copied"
-              >
-                {shareState === "error" ? "Copy failed — try again" : "Copy receipt link"}
+              <Button variant="secondary" onClick={shareReceipt}>
+                {shareState === "copied"
+                  ? "Link copied"
+                  : shareState === "error"
+                    ? "Copy failed — try again"
+                    : "Copy receipt link"}
               </Button>
               <Button variant="secondary" onClick={() => window.print()}>
                 Print / save receipt
@@ -693,7 +691,7 @@ export function ReceiptView({ requestId }: { requestId: string }) {
                 variant="ghost"
                 onClick={reverify}
                 loading={refreshing}
-                loadingText="Re-verifying"
+                loadingLabel="Re-verifying"
               >
                 Re-verify
               </Button>
@@ -717,7 +715,7 @@ export function ReceiptView({ requestId }: { requestId: string }) {
           </>
         ) : mismatch ? (
           <section className="receipt-empty">
-            <Banner tone="danger" title="Verification conflict">
+            <Banner variant="danger" title="Verification conflict">
               The contract state and the PaymentFulfilled event do not agree for this
               request ID. Do not treat this as a verified receipt. Check the request ID and
               verify both reads independently on the{" "}
@@ -727,7 +725,7 @@ export function ReceiptView({ requestId }: { requestId: string }) {
               .
             </Banner>
             <div className="receipt-actions">
-              <Button onClick={reverify} loading={refreshing} loadingText="Re-verifying on Monad">
+              <Button onClick={reverify} loading={refreshing} loadingLabel="Re-verifying on Monad">
                 Retry verification
               </Button>
             </div>
@@ -789,18 +787,20 @@ function ReceiptSkeleton() {
         Reading settlement from Monad Mainnet…
       </p>
       <section aria-busy="true" aria-label="Loading settlement confirmation">
-        <Skeleton variant="text" width={280} height={24} label="Loading settlement status" />
+        <Skeleton width={280} height={24} />
       </section>
       <section aria-busy="true" aria-label="Loading proof chain">
-        <Skeleton variant="block" className="receipt-proof-skeleton" label="Loading proof chain" />
+        <div className="receipt-proof-skeleton">
+          <Skeleton width="100%" height="100%" />
+        </div>
       </section>
       <section aria-busy="true" aria-label="Loading seal">
-        <Skeleton variant="block" height={72} label="Loading verification seal" />
+        <Skeleton width="100%" height={72} />
       </section>
       <section aria-busy="true" aria-label="Loading settlement record">
         <div className="receipt-skeleton-stack">
           {Array.from({ length: 10 }, (_, i) => (
-            <Skeleton key={i} variant="row" label={`Loading ledger row ${i + 1}`} />
+            <Skeleton key={i} width="100%" height={36} />
           ))}
         </div>
       </section>

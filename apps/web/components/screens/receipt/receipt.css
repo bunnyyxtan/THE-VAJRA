@@ -25,10 +25,25 @@
 .receipt-sealrow {
   display: flex;
   align-items: center;
+  gap: 16px;
   padding: 16px 24px;
   border-radius: var(--sc-radius-lg);
   background: linear-gradient(135deg, var(--sc-signature-surface), transparent 160%);
   border: 1px solid var(--v-border);
+}
+.receipt-sealrow__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.receipt-sealrow__title {
+  font-size: var(--sc-type-component);
+  font-weight: 700;
+  color: var(--v-signature, currentColor);
+}
+.receipt-sealrow__sub {
+  font-size: var(--sc-type-meta);
+  color: var(--v-muted);
 }
 
 .receipt-actions {

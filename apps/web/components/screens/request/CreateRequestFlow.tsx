@@ -14,14 +14,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getAddress, isAddress, toHex, type Address } from "viem";
 import { useAccount, useChainId, useConnect, useSignTypedData, useSwitchChain } from "wagmi";
 
-import { AmountInput } from "@/components/ui/AmountInput";
-import { Banner } from "@/components/ui/Banner";
-import { Button } from "@/components/ui/Button";
-import { CopyButton } from "@/components/ui/CopyButton";
-import { Input } from "@/components/ui/Input";
-import { LedgerBlock, LedgerRow } from "@/components/ui/Ledger";
-import { ProofChain, PROOF_CHAIN_STAGES, type ProofStage } from "@/components/ui/ProofChain";
-import { Sheet } from "@/components/ui/Sheet";
+import {
+  AmountInput,
+  Banner,
+  Button,
+  CopyButton,
+  Input,
+  LedgerBlock,
+  LedgerRow,
+  ProofChain,
+  Sheet,
+} from "@/components/ui";
 
 import { parseDecimalToUnits, formatUnits } from "@/lib/amount";
 import { getChainConfig, MONAD_MAINNET_CHAIN_ID } from "@/lib/chain";
@@ -42,6 +45,8 @@ import { AUTH_MODE, type Bytes32, type PaymentRequest } from "@/lib/vajra/types"
 
 import { StageRail } from "../StageRail";
 import { QrCode } from "../QrCode";
+import { CopyTextButton } from "../CopyTextButton";
+import { buildProofStages, type ProofProgress } from "../proof-stages";
 import { ExpiryField, EXPIRY_PRESET_SECONDS, type ExpiryPreset } from "./ExpiryField";
 import { MemoField } from "./MemoField";
 
@@ -138,16 +143,15 @@ export function CreateRequestFlow() {
   const wrongChain = mounted && isConnected && walletChainId !== MONAD_MAINNET_CHAIN_ID;
 
   // --- Proof chain status (7-stage motif; the first three belong here)
-  const proofStages: ProofStage[] = useMemo(() => {
+  const proofStages = useMemo(() => {
     const signed = draft !== null && (stageReached >= 2 || step === "success");
     const shared = step === "success";
-    return PROOF_CHAIN_STAGES.map((label, i) => {
-      let status: ProofStage["status"] = "upcoming";
-      if (i === 0) status = draft ? "complete" : "current";
-      else if (i === 1) status = signed ? "complete" : draft ? "current" : "upcoming";
-      else if (i === 2) status = shared ? "complete" : signed ? "current" : "upcoming";
-      return { label, status };
-    });
+    const progress: ProofProgress[] = [
+      draft ? "done" : "current",
+      signed ? "done" : draft ? "current" : "pending",
+      shared ? "done" : signed ? "current" : "pending",
+    ];
+    return buildProofStages(progress);
   }, [draft, stageReached, step]);
 
   function connectWallet() {
@@ -310,6 +314,71 @@ export function CreateRequestFlow() {
 
   const signing = stageWaiting;
 
+  const termsLedger = draft && (
+    <LedgerBlock title="Request terms">
+      <LedgerRow
+        label="Amount"
+        value={
+          <>
+            <span className="sc-tnum">
+              {formatUnits(draft.request.amount, MON_DECIMALS)} MON
+            </span>{" "}
+            <span className="sc-mono" style={{ color: "var(--v-muted)" }}>
+              {draft.request.amount.toString()} wei
+            </span>
+          </>
+        }
+        copyValue={draft.request.amount.toString()}
+      />
+      <LedgerRow
+        label="Recipient"
+        mono
+        copyValue={draft.request.recipient}
+        value={<span className="sc-break">{draft.request.recipient}</span>}
+      />
+      <LedgerRow
+        label="Payer"
+        mono={draft.request.payer !== ANY_PAYER}
+        copyValue={draft.request.payer !== ANY_PAYER ? draft.request.payer : undefined}
+        value={
+          draft.request.payer === ANY_PAYER ? (
+            "Open request — any payer"
+          ) : (
+            <span className="sc-break">{draft.request.payer}</span>
+          )
+        }
+      />
+      <LedgerRow
+        label="Expires"
+        value={
+          <span className="sc-tnum">
+            {dateTimeFormat.format(new Date(Number(draft.request.expiresAt) * 1000))}{" "}
+            <span style={{ color: "var(--v-muted)" }}>
+              ({relativeFromNow(draft.request.expiresAt)})
+            </span>
+          </span>
+        }
+      />
+      <LedgerRow label="Memo" value={draft.memo.trim() === "" ? "None" : draft.memo} />
+      <LedgerRow
+        label="Chain"
+        value={`Monad Mainnet · chain ID ${MONAD_MAINNET_CHAIN_ID}`}
+      />
+      <LedgerRow
+        label="Contract"
+        mono
+        copyValue={chainConfig.contractAddress}
+        value={<span className="sc-break">{chainConfig.contractAddress}</span>}
+      />
+      <LedgerRow
+        label="Vajra Code"
+        mono
+        copyValue={draft.vajraCode}
+        value={draft.vajraCode}
+      />
+    </LedgerBlock>
+  );
+
   return (
     <div className="vscreen">
       <div className="vscreen__page">
@@ -323,13 +392,13 @@ export function CreateRequestFlow() {
           <div className="instrument-grid__main">
             {wrongChain && (
               <Banner
-                tone="warning"
+                variant="warning"
                 title="Wrong network"
                 action={
                   <Button
                     variant="secondary"
                     loading={isSwitching}
-                    loadingText="Switching"
+                    loadingLabel="Switching"
                     onClick={() => switchChain({ chainId: MONAD_MAINNET_CHAIN_ID })}
                   >
                     Switch to Monad Mainnet
@@ -359,7 +428,7 @@ export function CreateRequestFlow() {
                     setAmount(v);
                     if (errors.amount) setErrors((e) => ({ ...e, amount: undefined }));
                   }}
-                  unit="MON"
+                  symbol="MON"
                   decimals={MON_DECIMALS}
                   error={errors.amount}
                   autoFocus
@@ -422,7 +491,7 @@ export function CreateRequestFlow() {
                     <Button
                       variant="secondary"
                       loading={isConnecting}
-                      loadingText="Connecting"
+                      loadingLabel="Connecting"
                       onClick={connectWallet}
                     >
                       Connect wallet
@@ -440,73 +509,7 @@ export function CreateRequestFlow() {
 
             {step === "review" && draft && (
               <>
-                <LedgerBlock title="Request terms">
-                  <LedgerRow
-                    label="Amount"
-                    value={
-                      <>
-                        <span className="sc-tnum">
-                          {formatUnits(draft.request.amount, MON_DECIMALS)} MON
-                        </span>{" "}
-                        <span className="sc-mono" style={{ color: "var(--v-muted)" }}>
-                          {draft.request.amount.toString()} wei
-                        </span>
-                      </>
-                    }
-                  />
-                  <LedgerRow
-                    label="Recipient"
-                    value={<span className="sc-break">{draft.request.recipient}</span>}
-                    mono
-                    aside={<CopyButton text={draft.request.recipient} />}
-                  />
-                  <LedgerRow
-                    label="Payer"
-                    value={
-                      draft.request.payer === ANY_PAYER ? (
-                        "Open request — any payer"
-                      ) : (
-                        <span className="sc-break">{draft.request.payer}</span>
-                      )
-                    }
-                    mono={draft.request.payer !== ANY_PAYER}
-                    aside={
-                      draft.request.payer !== ANY_PAYER ? (
-                        <CopyButton text={draft.request.payer} />
-                      ) : undefined
-                    }
-                  />
-                  <LedgerRow
-                    label="Expires"
-                    value={
-                      <span className="sc-tnum">
-                        {dateTimeFormat.format(
-                          new Date(Number(draft.request.expiresAt) * 1000),
-                        )}{" "}
-                        <span style={{ color: "var(--v-muted)" }}>
-                          ({relativeFromNow(draft.request.expiresAt)})
-                        </span>
-                      </span>
-                    }
-                  />
-                  <LedgerRow label="Memo" value={draft.memo.trim() === "" ? "None" : draft.memo} />
-                  <LedgerRow
-                    label="Chain"
-                    value={`Monad Mainnet · chain ID ${MONAD_MAINNET_CHAIN_ID}`}
-                  />
-                  <LedgerRow
-                    label="Contract"
-                    value={<span className="sc-break">{chainConfig.contractAddress}</span>}
-                    mono
-                    aside={<CopyButton text={chainConfig.contractAddress} />}
-                  />
-                  <LedgerRow
-                    label="Vajra Code"
-                    value={draft.vajraCode}
-                    mono
-                    aside={<CopyButton text={draft.vajraCode} />}
-                  />
-                </LedgerBlock>
+                {termsLedger}
 
                 <StageRail
                   stages={REQUEST_STAGES}
@@ -560,51 +563,12 @@ export function CreateRequestFlow() {
                   <span className="link-row__url" title={link}>
                     {link}
                   </span>
-                  <CopyButton text={link} label="Copy link" />
+                  <CopyButton value={link} label="payment link" />
                 </div>
 
                 <QrCode value={link} label="QR code containing the payment link" />
 
-                <LedgerBlock title="Request terms">
-                  <LedgerRow
-                    label="Amount"
-                    value={
-                      <>
-                        <span className="sc-tnum">
-                          {formatUnits(draft.request.amount, MON_DECIMALS)} MON
-                        </span>{" "}
-                        <span className="sc-mono" style={{ color: "var(--v-muted)" }}>
-                          {draft.request.amount.toString()} wei
-                        </span>
-                      </>
-                    }
-                  />
-                  <LedgerRow
-                    label="Recipient"
-                    value={<span className="sc-break">{draft.request.recipient}</span>}
-                    mono
-                    aside={<CopyButton text={draft.request.recipient} />}
-                  />
-                  <LedgerRow
-                    label="Expires"
-                    value={
-                      <span className="sc-tnum">
-                        {dateTimeFormat.format(
-                          new Date(Number(draft.request.expiresAt) * 1000),
-                        )}{" "}
-                        <span style={{ color: "var(--v-muted)" }}>
-                          ({relativeFromNow(draft.request.expiresAt)})
-                        </span>
-                      </span>
-                    }
-                  />
-                  <LedgerRow
-                    label="Vajra Code"
-                    value={draft.vajraCode}
-                    mono
-                    aside={<CopyButton text={draft.vajraCode} />}
-                  />
-                </LedgerBlock>
+                {termsLedger}
               </>
             )}
           </div>
@@ -623,9 +587,9 @@ export function CreateRequestFlow() {
                 />
                 <LedgerRow
                   label="Contract"
-                  value={<span className="sc-break">{chainConfig.contractAddress}</span>}
                   mono
-                  aside={<CopyButton text={chainConfig.contractAddress} />}
+                  copyValue={chainConfig.contractAddress}
+                  value={<span className="sc-break">{chainConfig.contractAddress}</span>}
                 />
                 <LedgerRow label="Authorization" value="Recipient signature (EIP-712)" />
               </LedgerBlock>
@@ -647,7 +611,7 @@ export function CreateRequestFlow() {
               <Button
                 className="actionbar__primary"
                 loading={signing}
-                loadingText={stageReached <= 0 ? "Preparing terms" : "Awaiting signature"}
+                loadingLabel={stageReached <= 0 ? "Preparing terms" : "Awaiting signature"}
                 disabled={wrongChain}
                 onClick={onSign}
               >
@@ -665,10 +629,11 @@ export function CreateRequestFlow() {
           )}
           {step === "success" && link && (
             <>
-              <CopyButton
-                text={link}
+              <CopyTextButton
+                value={link}
                 label="Copy payment link"
                 copiedLabel="Link copied"
+                className="actionbar__primary"
               />
               <Button
                 variant="ghost"
@@ -685,7 +650,7 @@ export function CreateRequestFlow() {
       {/* Wallet picker — bottom sheet when more than one wallet is available */}
       <Sheet
         open={walletSheetOpen}
-        onClose={() => setWalletSheetOpen(false)}
+        onOpenChange={setWalletSheetOpen}
         title="Connect a wallet"
       >
         <div className="wallet-sheet">
@@ -693,6 +658,7 @@ export function CreateRequestFlow() {
             <Button
               key={connector.uid}
               variant="secondary"
+              fullWidth
               onClick={() => {
                 connect({ connector });
                 setWalletSheetOpen(false);

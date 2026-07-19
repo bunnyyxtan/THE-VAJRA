@@ -14,9 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Hex } from "viem";
 
-import { Button } from "@/components/ui/Button";
-import { CopyButton } from "@/components/ui/CopyButton";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { Button, CopyButton, Skeleton, SkeletonLines } from "@/components/ui";
 
 import { formatUnits } from "@/lib/amount";
 import { explorerTxUrl, getChainConfig } from "@/lib/chain";
@@ -86,7 +84,7 @@ function statusLabel(s: RowStatus): string {
 
 function StatusPill({ status }: { status: RowStatus }) {
   if (status.kind === "loading") {
-    return <Skeleton variant="text" width={64} label="Checking request status" />;
+    return <Skeleton width={64} />;
   }
   return (
     <span className={`activity-pill activity-pill--${status.kind}`}>
@@ -222,9 +220,7 @@ export function ActivityLedger() {
         {!mounted ? (
           <section aria-busy="true" aria-label="Loading local activity">
             <div className="activity-stack">
-              {Array.from({ length: 3 }, (_, i) => (
-                <Skeleton key={i} variant="row" label={`Loading activity row ${i + 1}`} />
-              ))}
+              <SkeletonLines lines={3} lineHeight={44} gap={12} />
             </div>
           </section>
         ) : empty ? (
@@ -256,7 +252,7 @@ export function ActivityLedger() {
                     variant="ghost"
                     onClick={onRefresh}
                     loading={refreshing}
-                    loadingText="Re-reading"
+                    loadingLabel="Re-reading"
                   >
                     Refresh
                   </Button>
@@ -316,7 +312,7 @@ export function ActivityLedger() {
                         </div>
                         <div className="activity-row__actions">
                           {shareLink !== "" && (
-                            <CopyButton text={shareLink} label="Copy link" copiedLabel="Copied" />
+                            <CopyButton value={shareLink} label="payment link" />
                           )}
                           {status.kind === "paid" && (
                             <Button
@@ -364,7 +360,7 @@ export function ActivityLedger() {
                         </div>
                       </div>
                       <div className="activity-row__actions">
-                        <CopyButton text={tx.txHash} label="Copy hash" copiedLabel="Copied" />
+                        <CopyButton value={tx.txHash} label="transaction hash" />
                         <a
                           className="activity-row__link"
                           href={explorerTxUrl(tx.txHash, chainConfig)}

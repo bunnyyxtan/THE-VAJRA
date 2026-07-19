@@ -38,12 +38,15 @@
   --sc-ease-emphasis: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* Technical identifiers */
-  --sc-mono: var(--v-font-mono, "IBM Plex Mono", ui-monospace, SFMono-Regular,
+  --sc-mono: var(--font-mono, "IBM Plex Mono", ui-monospace, SFMono-Regular,
     Menlo, Consolas, monospace);
 
   /* Semantic surfaces (paired with --v-success/--v-warning/--v-danger/--v-info
-     from globals). Dark-first defaults; light overrides below. */
-  --sc-selected: #21182b;
+     from globals). Dark-first defaults; light overrides below. Selected and
+     signature surfaces come straight from globals (--v-selected,
+     --v-signature-surface, both themes). */
+  --sc-selected: var(--v-selected, #21182b);
+  --sc-signature-surface: var(--v-signature-surface, #2a211f);
   --sc-success-surface: rgba(63, 176, 110, 0.12);
   --sc-success-border: rgba(63, 176, 110, 0.38);
   --sc-warning-surface: rgba(217, 164, 65, 0.12);
@@ -52,7 +55,6 @@
   --sc-danger-border: rgba(224, 92, 92, 0.4);
   --sc-info-surface: rgba(96, 150, 240, 0.12);
   --sc-info-border: rgba(96, 150, 240, 0.38);
-  --sc-signature-surface: #2a211f;
 
   /* Glass overlay defaults (used only if globals has not defined --v-glass) */
   --sc-glass: var(--v-glass, rgba(18, 14, 25, 0.72));
@@ -64,7 +66,6 @@
 }
 
 [data-theme="light"] .vscreen {
-  --sc-selected: #eee9ff;
   --sc-success-surface: rgba(28, 138, 74, 0.1);
   --sc-success-border: rgba(28, 138, 74, 0.34);
   --sc-warning-surface: rgba(176, 122, 20, 0.1);
@@ -73,7 +74,6 @@
   --sc-danger-border: rgba(196, 60, 60, 0.32);
   --sc-info-surface: rgba(46, 106, 210, 0.08);
   --sc-info-border: rgba(46, 106, 210, 0.32);
-  --sc-signature-surface: #f3e7e0;
   --sc-glass: var(--v-glass, rgba(255, 255, 255, 0.78));
   --sc-glass-border: var(--v-glass-border, var(--v-border, #ddd6e1));
 }
@@ -638,16 +638,17 @@
 }
 
 /* --- Bottom action bar (mobile native-app primary action, thumb zone) ------
-   Fixed at bottom with safe-area padding on phones; glass overlay with
-   progressive blur; becomes a normal inline row on desktop. ---------------- */
+   Fixed above the global bottom nav on phones (the nav owns the bottom edge,
+   glass overlay, safe-area padding); glass with progressive blur; becomes a
+   normal inline row on desktop. ------------------------------------------- */
 
 .actionbar {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
-  z-index: 40;
-  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--bottomnav-h, 60px) + env(safe-area-inset-bottom, 0px));
+  z-index: var(--z-header, 50);
+  padding: 12px 16px;
 }
 .actionbar::before {
   content: "";
@@ -676,6 +677,14 @@
 }
 .actionbar button {
   min-height: 48px;
+}
+
+/* Tablet: no bottom nav — the action bar owns the bottom edge. */
+@media (min-width: 768px) {
+  .actionbar {
+    bottom: 0;
+    padding-bottom: 12px;
+  }
 }
 
 @media (min-width: 1024px) {
@@ -806,6 +815,18 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--v-text);
+}
+
+/* --- Wallet picker sheet content ------------------------------------------ */
+
+.wallet-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.wallet-sheet button {
+  min-height: 48px;
+  justify-content: flex-start;
 }
 
 /* --- Reduced motion: collapse all screen animation to instant opacity ------ */

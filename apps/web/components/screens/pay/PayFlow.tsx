@@ -24,12 +24,7 @@ import {
   useSwitchChain,
 } from "wagmi";
 
-import { Banner } from "@/components/ui/Banner";
-import { Button } from "@/components/ui/Button";
-import { CopyButton } from "@/components/ui/CopyButton";
-import { LedgerBlock, LedgerRow } from "@/components/ui/Ledger";
-import { Sheet } from "@/components/ui/Sheet";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { Banner, Button, CopyButton, LedgerBlock, LedgerRow, Sheet, Skeleton } from "@/components/ui";
 
 import { formatUnits } from "@/lib/amount";
 import { getChainConfig, MONAD_MAINNET_CHAIN_ID, explorerAddressUrl } from "@/lib/chain";
@@ -548,11 +543,13 @@ export function PayFlow() {
             <p className="vscreen__sub">Reading the signed terms from this link…</p>
           </div>
           <section aria-busy="true" aria-label="Loading payment terms">
-            <Skeleton variant="block" height={96} label="Loading amount" />
+            <Skeleton width="100%" height={96} />
             <div style={{ height: 16 }} />
-            <Skeleton variant="row" label="Loading terms row 1" />
-            <Skeleton variant="row" label="Loading terms row 2" />
-            <Skeleton variant="row" label="Loading terms row 3" />
+            <Skeleton width="100%" height={44} />
+            <div style={{ height: 8 }} />
+            <Skeleton width="100%" height={44} />
+            <div style={{ height: 8 }} />
+            <Skeleton width="100%" height={44} />
           </section>
         </div>
       </div>
@@ -593,12 +590,15 @@ export function PayFlow() {
     );
   }
 
+  if (!ready) return null; // unreachable — the early returns above cover it
+
   const { request, memo } = ready.decoded;
   const amountMon = formatUnits(request.amount, MON_DECIMALS);
   const restricted = request.payer !== zeroAddress;
   const checkedAt = checkState.kind === "done" ? checkState.at : null;
   const showMainnetBanner =
-    payable && (exec.kind === "idle" || exec.kind === "preparing" || exec.kind === "awaiting_wallet");
+    (exec.kind === "idle" || exec.kind === "preparing" || exec.kind === "awaiting_wallet") &&
+    (payable || derived.kind === "checking" || derived.kind === "unavailable");
 
   return (
     <div className="vscreen">
@@ -618,7 +618,7 @@ export function PayFlow() {
 
         {/* Real-money banner — always visible before the payment is submitted */}
         {showMainnetBanner && (
-          <Banner tone="warning" title="Monad Mainnet — Real MON will move">
+          <Banner variant="warning" title="Monad Mainnet — Real MON will move">
             Paying sends {amountMon} MON from your wallet to the recipient on Monad
             Mainnet. This cannot be undone.
           </Banner>
@@ -626,13 +626,13 @@ export function PayFlow() {
 
         {wrongChain && payable && (
           <Banner
-            tone="warning"
+            variant="warning"
             title="Wrong network"
             action={
               <Button
                 variant="secondary"
                 loading={isSwitching}
-                loadingText="Switching"
+                loadingLabel="Switching"
                 onClick={() => void onSwitchNetwork()}
               >
                 Switch to Monad Mainnet
@@ -659,7 +659,7 @@ export function PayFlow() {
             <div className="vajra-code">
               <span className="vajra-code__label">Vajra Code</span>
               <span className="vajra-code__value">{ready.vajraCode}</span>
-              <CopyButton text={ready.vajraCode} label="Copy" />
+              <CopyButton value={ready.vajraCode} label="Vajra Code" />
             </div>
             <p className="sc-note">
               <InfoIcon />
@@ -815,7 +815,7 @@ export function PayFlow() {
                         label="Hash"
                         value={<span className="sc-break">{exec.txHash}</span>}
                         mono
-                        aside={<CopyButton text={exec.txHash} />}
+                        copyValue={exec.txHash}
                       />
                     </LedgerBlock>
                     <p className="sc-note">
@@ -878,7 +878,7 @@ export function PayFlow() {
                   label="Recipient"
                   value={<span className="sc-break">{request.recipient}</span>}
                   mono
-                  aside={<CopyButton text={request.recipient} />}
+                  copyValue={request.recipient}
                 />
                 <LedgerRow
                   label="Payer"
@@ -890,7 +890,7 @@ export function PayFlow() {
                     )
                   }
                   mono={restricted}
-                  aside={restricted ? <CopyButton text={request.payer} /> : undefined}
+                  copyValue={restricted ? request.payer : undefined}
                 />
                 <LedgerRow
                   label="Amount"
@@ -902,6 +902,7 @@ export function PayFlow() {
                       </span>
                     </>
                   }
+                  copyValue={request.amount.toString()}
                 />
                 <LedgerRow
                   label="Expires"
@@ -927,7 +928,7 @@ export function PayFlow() {
                   label="Request ID"
                   value={<span className="sc-break">{ready.requestId}</span>}
                   mono
-                  aside={<CopyButton text={ready.requestId} />}
+                  copyValue={ready.requestId}
                 />
                 <LedgerRow
                   label="Chain"
@@ -935,22 +936,19 @@ export function PayFlow() {
                 />
                 <LedgerRow
                   label="Contract"
-                  value={<span className="sc-break">{chainConfig.contractAddress}</span>}
                   mono
-                  aside={
-                    <>
-                      <CopyButton text={chainConfig.contractAddress} />
-                      <a
-                        href={explorerAddressUrl(chainConfig.contractAddress, chainConfig)}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ fontSize: "var(--sc-type-compact)", fontWeight: 600 }}
-                      >
-                        Monadscan
-                      </a>
-                    </>
-                  }
-                />
+                  copyValue={chainConfig.contractAddress}
+                >
+                  <span className="sc-break">{chainConfig.contractAddress}</span>{" "}
+                  <a
+                    href={explorerAddressUrl(chainConfig.contractAddress, chainConfig)}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: "var(--sc-type-compact)", fontWeight: 600 }}
+                  >
+                    Monadscan
+                  </a>
+                </LedgerRow>
               </LedgerBlock>
             </div>
           </div>
@@ -967,7 +965,7 @@ export function PayFlow() {
                   label="Contract"
                   value={<span className="sc-break">{chainConfig.contractAddress}</span>}
                   mono
-                  aside={<CopyButton text={chainConfig.contractAddress} />}
+                  copyValue={chainConfig.contractAddress}
                 />
                 <LedgerRow
                   label="Exact value"
@@ -998,14 +996,26 @@ export function PayFlow() {
       </div>
 
       {/* Primary action — fixed in the thumb zone on mobile */}
-      {(payable || derived.kind === "already_paid") && exec.kind !== "tracking" && exec.kind !== "settled" && (
+      {exec.kind === "settled" ? (
+        <div className="actionbar">
+          <div className="actionbar__inner">
+            <Button
+              className="actionbar__primary"
+              onClick={() => router.push(`/receipt/${ready.requestId}`)}
+            >
+              View sealed receipt
+            </Button>
+          </div>
+        </div>
+      ) : (
+        (payable || derived.kind === "already_paid") && exec.kind !== "tracking" && (
         <div className="actionbar">
           <div className="actionbar__inner">
             {payable && !isConnected && (
               <Button
                 className="actionbar__primary"
                 loading={isConnecting}
-                loadingText="Connecting"
+                loadingLabel="Connecting"
                 onClick={connectWallet}
               >
                 Connect wallet to pay
@@ -1015,7 +1025,7 @@ export function PayFlow() {
               <Button
                 className="actionbar__primary"
                 loading={isSwitching}
-                loadingText="Switching"
+                loadingLabel="Switching"
                 onClick={() => void onSwitchNetwork()}
               >
                 Switch to Monad Mainnet
@@ -1025,7 +1035,7 @@ export function PayFlow() {
               <Button
                 className="actionbar__primary"
                 loading={busy}
-                loadingText={
+                loadingLabel={
                   exec.kind === "preparing" ? "Preparing transaction" : "Awaiting wallet approval"
                 }
                 disabled={busy}
@@ -1045,15 +1055,17 @@ export function PayFlow() {
             )}
           </div>
         </div>
+        )
       )}
 
       {/* Wallet picker — bottom sheet when more than one wallet is available */}
-      <Sheet open={walletSheetOpen} onClose={() => setWalletSheetOpen(false)} title="Connect a wallet">
+      <Sheet open={walletSheetOpen} onOpenChange={setWalletSheetOpen} title="Connect a wallet">
         <div className="wallet-sheet">
           {connectors.map((connector) => (
             <Button
               key={connector.uid}
               variant="secondary"
+              fullWidth
               onClick={() => {
                 connect({ connector });
                 setWalletSheetOpen(false);
