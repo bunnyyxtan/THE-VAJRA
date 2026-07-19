@@ -6,9 +6,8 @@ solc = "0.8.30"
 optimizer = true
 optimizer_runs = 1000
 via_ir = false
-metadata = true
-metadata_hash = "none"      # per Monad verify guide: https://docs.monad.xyz/guides/verify-smart-contract/foundry
-use_literal_content = true  # per Monad verify guide
+bytecode_hash = "none"      # disable ipfs hash, per Monad verify guide: https://docs.monad.xyz/guides/verify-smart-contract/foundry
+use_literal_content = true  # store plain source in metadata, per Monad verify guide
 
 # Monad MAINNET configuration (verified 2026-07-19 against https://docs.monad.xyz/developer-essentials/network-information)
 eth-rpc-url = "https://rpc.monad.xyz"
