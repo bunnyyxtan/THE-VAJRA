@@ -43,6 +43,7 @@ export default function Hero() {
 
   return (
     <main className={styles.page}>
+      <div className={styles.grain} aria-hidden="true" />
       <header className={styles.header}>
         <span className={styles.wordmark}>
           VAJRA<span className={styles.wordmarkDot} />
@@ -54,6 +55,15 @@ export default function Hero() {
       </header>
 
       <div className={styles.stage} ref={stageRef}>
+        {/* floating tx chip — deepest layer, heaviest frost */}
+        <div className={`${styles.card} ${styles.chip}`}>
+          <span className={`mono ${styles.chipHash}`}>0x94ca…09a2</span>
+          <span className={styles.chipStatus}>
+            <span className={styles.chipDot} />
+            settled
+          </span>
+        </div>
+
         {/* floating request card — the toy */}
         <div className={`${styles.card} ${styles.cardA}`} ref={cardARef}>
           <div className={styles.cardTop}>
@@ -103,8 +113,7 @@ export default function Hero() {
             Signed by them.
             <br />
             <span className={styles.headlineAccent}>Final on Monad.</span>
-          </h1>
-          <p className={styles.sub}>
+          </h1><p className={styles.sub}>
             Payment requests the recipient signs before you pay. One exact
             amount, one recipient, one settlement — verified onchain, sealed
             forever.
@@ -125,6 +134,10 @@ export default function Hero() {
             <span>No custody</span>
           </div>
         </div>
+      </div>
+
+      <div className={styles.ghost} aria-hidden="true">
+        VAJRA
       </div>
     </main>
   );
