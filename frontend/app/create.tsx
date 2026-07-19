@@ -22,25 +22,33 @@ import {
   VajraTouchSheet,
 } from "@/src/components/WalletSheets";
 import {
+  delay,
   fmtDateTime,
   fmtMon,
-  fmtUsd,
   isHexAddress,
-  makeId,
   shortAddr,
-  sigFor,
 } from "@/src/lib/format";
-import { MON_USD, VAJRA_CONTRACT, delay } from "@/src/lib/mock";
+import { buildRecord } from "@/src/lib/real";
+import { parseDecimalToUnits } from "@/src/lib/web3/amount";
+import { getChainConfig } from "@/src/lib/web3/chain";
+import { getPublicClient } from "@/src/lib/web3/client";
+import { classifyError, userCopy, type VajraError } from "@/src/lib/web3/errors";
+import { buildPaymentRequest, ANY_PAYER } from "@/src/lib/web3/vajra/domain";
+import { encodePayload, walletShareProof } from "@/src/lib/web3/vajra/encode";
+import { vajraCodeFromRequestId } from "@/src/lib/web3/vajra/fingerprint";
+import { computeRequestId, paymentRequestTypedData } from "@/src/lib/web3/vajra/hash";
+import { AUTH_MODE } from "@/src/lib/web3/vajra/types";
+import { getVajraWallet } from "@/src/lib/web3/wallet";
 import type { PaymentRequest } from "@/src/lib/types";
+import { getAddress, type Hex } from "viem";
 import { useMotionPref, useVajra } from "@/src/state/vajra";
 import { C, F, MONO, R, S, cardShadow } from "@/src/theme";
 
 const EXPIRY_OPTIONS = [
-  { key: "1h", label: "1 hour", hours: 1 },
-  { key: "24h", label: "24 hours", hours: 24 },
-  { key: "7d", label: "7 days", hours: 168 },
-  { key: "30d", label: "30 days", hours: 720 },
-  { key: "none", label: "No expiry", hours: null },
+  { key: "1h", label: "1 hour", seconds: 3600n },
+  { key: "24h", label: "24 hours", seconds: 86400n },
+  { key: "7d", label: "7 days", seconds: 604800n },
+  { key: "30d", label: "30 days", seconds: 2592000n },
 ] as const;
 
 type ExpiryKey = (typeof EXPIRY_OPTIONS)[number]["key"];
@@ -48,13 +56,11 @@ type ExpiryKey = (typeof EXPIRY_OPTIONS)[number]["key"];
 const validateAmount = (raw: string): string | null => {
   const v = raw.trim();
   if (!v) return "Enter an amount greater than 0 MON to continue.";
-  if (!/^\d*\.?\d*$/.test(v)) return "Use numbers and a single decimal point only.";
-  const n = parseFloat(v);
-  if (!isFinite(n) || n <= 0)
+  const units = parseDecimalToUnits(v, 18);
+  if (units === null)
+    return "Use numbers and a single decimal point (up to 18 decimals) only.";
+  if (units <= 0n)
     return "Enter an amount greater than 0 MON to continue.";
-  if (n > 1_000_000_000) return "That amount is above the 1,000,000,000 MON limit.";
-  const dec = v.split(".")[1];
-  if (dec && dec.length > 6) return "MON amounts support up to 6 decimal places.";
   return null;
 };
 
