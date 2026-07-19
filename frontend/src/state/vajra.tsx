@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import React, {
   createContext,
   useCallback,
@@ -9,13 +10,14 @@ import React, {
 } from "react";
 import { useReducedMotion } from "react-native-reanimated";
 
-import { DEMO_REQUESTS, seedRequests } from "@/src/lib/mock";
 import type {
   PaymentRequest,
   Passkey,
   Settings,
   Wallet,
 } from "@/src/lib/types";
+import { MONAD_MAINNET_CHAIN_ID } from "@/src/lib/web3/chain";
+import { getVajraWallet } from "@/src/lib/web3/wallet";
 import { storage } from "@/src/utils/storage";
 
 const K = {
@@ -28,8 +30,20 @@ const K = {
 const DEFAULT_SETTINGS: Settings = {
   reduceMotion: false,
   reduceTransparency: false,
-  outage: false,
 };
+
+/** Honest network label from a live chain id. */
+export const networkLabel = (chainId: number | undefined): string =>
+  chainId === MONAD_MAINNET_CHAIN_ID
+    ? "Monad Mainnet"
+    : `Chain ${chainId ?? "?"}`;
+
+const walletFor = (address: string, chainId: number | undefined): Wallet => ({
+  address,
+  label: "Browser wallet",
+  network: networkLabel(chainId),
+  chainId,
+});
 
 interface VajraCtx {
   hydrated: boolean;
@@ -37,7 +51,12 @@ interface VajraCtx {
   setPasskey: (p: Passkey | null) => void;
   wallet: Wallet | null;
   setWallet: (w: Wallet | null) => void;
-  setWalletNetwork: (n: Wallet["network"]) => void;
+  /** eth_requestAccounts via the injected wallet; updates state. */
+  connectWallet: () => Promise<Wallet>;
+  /** Clears local wallet state (injected wallets hold no session to close). */
+  disconnectWallet: () => void;
+  /** Switch/add Monad Mainnet in the wallet; updates state. */
+  switchToMonad: () => Promise<number>;
   requests: PaymentRequest[];
   addRequest: (r: PaymentRequest) => void;
   updateRequest: (id: string, patch: Partial<PaymentRequest>) => void;
@@ -66,28 +85,51 @@ export function VajraProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      const [pk, wl, rq, st] = await Promise.all([
+      const [pk, rq, st] = await Promise.all([
         storage.getItem(K.passkey, null),
-        storage.getItem(K.wallet, null),
         storage.getItem(K.requests, null),
         storage.getItem(K.settings, null),
       ]);
       setPasskeyState(parse<Passkey | null>(pk as string | null, null));
-      setWalletState(parse<Wallet | null>(wl as string | null, null));
-      const stored = parse<PaymentRequest[] | null>(rq as string | null, null);
-      if (stored === null) {
-        const seeded = seedRequests();
-        setRequests(seeded);
-        storage.setItem(K.requests, JSON.stringify(seeded));
-      } else {
-        setRequests(stored);
-      }
+      // Real records only — nothing is seeded. Empty means empty.
+      setRequests(parse<PaymentRequest[] | null>(rq as string | null, null) ?? []);
       setSettings({
         ...DEFAULT_SETTINGS,
         ...parse<Partial<Settings>>(st as string | null, {}),
       });
+
+      // Restore the wallet from the provider itself (silent probe), never
+      // from stale local state: whatever the injected wallet reports is truth.
+      if (Platform.OS === "web") {
+        const account = await getVajraWallet().currentAccount();
+        if (account) setWalletState(walletFor(account.address, account.chainId));
+      }
       setHydrated(true);
     })();
+  }, []);
+
+  // Live wallet events (web): account switch, disconnect, chain switch.
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const w = getVajraWallet();
+    const offAccounts = w.on("accountsChanged", () => {
+      void w.currentAccount().then((account) => {
+        setWalletState(account ? walletFor(account.address, account.chainId) : null);
+      });
+    });
+    const offChain = w.on("chainChanged", () => {
+      void w.currentAccount().then((account) => {
+        setWalletState((prev) =>
+          prev && account
+            ? walletFor(account.address, account.chainId)
+            : prev,
+        );
+      });
+    });
+    return () => {
+      offAccounts();
+      offChain();
+    };
   }, []);
 
   const setPasskey = useCallback((p: Passkey | null) => {
@@ -100,13 +142,26 @@ export function VajraProvider({ children }: { children: React.ReactNode }) {
     storage.setItem(K.wallet, JSON.stringify(w));
   }, []);
 
-  const setWalletNetwork = useCallback((n: Wallet["network"]) => {
+  const connectWallet = useCallback(async (): Promise<Wallet> => {
+    const account = await getVajraWallet().connect();
+    const next = walletFor(account.address, account.chainId);
+    setWallet(next);
+    return next;
+  }, [setWallet]);
+
+  const disconnectWallet = useCallback(() => {
+    setWallet(null);
+  }, [setWallet]);
+
+  const switchToMonad = useCallback(async (): Promise<number> => {
+    const chainId = await getVajraWallet().switchToMonad();
     setWalletState((prev) => {
       if (!prev) return prev;
-      const next = { ...prev, network: n };
+      const next = { ...prev, chainId, network: networkLabel(chainId) };
       storage.setItem(K.wallet, JSON.stringify(next));
       return next;
     });
+    return chainId;
   }, []);
 
   const persistRequests = useCallback((next: PaymentRequest[]) => {
@@ -130,9 +185,6 @@ export function VajraProvider({ children }: { children: React.ReactNode }) {
       const existing = list.find((x) => x.id === id);
       if (existing) {
         persistRequests(list.map((x) => (x.id === id ? { ...x, ...patch } : x)));
-      } else if (DEMO_REQUESTS[id]) {
-        // paying a demo request — persist a local copy so the receipt survives
-        persistRequests([{ ...DEMO_REQUESTS[id], ...patch }, ...list]);
       }
     },
     [persistRequests],
@@ -140,7 +192,7 @@ export function VajraProvider({ children }: { children: React.ReactNode }) {
 
   const getRequest = useCallback(
     (id: string): PaymentRequest | undefined =>
-      requestsRef.current.find((x) => x.id === id) ?? DEMO_REQUESTS[id],
+      requestsRef.current.find((x) => x.id === id),
     [],
   );
 
@@ -162,7 +214,9 @@ export function VajraProvider({ children }: { children: React.ReactNode }) {
       setPasskey,
       wallet,
       setWallet,
-      setWalletNetwork,
+      connectWallet,
+      disconnectWallet,
+      switchToMonad,
       requests,
       addRequest,
       updateRequest,
@@ -178,7 +232,9 @@ export function VajraProvider({ children }: { children: React.ReactNode }) {
       settings,
       setPasskey,
       setWallet,
-      setWalletNetwork,
+      connectWallet,
+      disconnectWallet,
+      switchToMonad,
       addRequest,
       updateRequest,
       getRequest,

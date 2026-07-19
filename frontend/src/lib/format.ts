@@ -19,6 +19,10 @@ export const fmtMon = (v: string | number): string => {
   return trimmedDec ? `${grouped}.${trimmedDec}` : grouped;
 };
 
+/** Visual pacing helper for designed animations — never used for chain state. */
+export const delay = (ms: number): Promise<void> =>
+  new Promise((r) => setTimeout(r, ms));
+
 export const fmtUsd = (mon: number, rate: number): string =>
   (mon * rate).toLocaleString("en-US", {
     style: "currency",
@@ -65,28 +69,3 @@ export const timeUntil = (iso: string | null): string | null => {
   if (h < 48) return `${h}h ${m % 60}m`;
   return `${Math.floor(h / 24)} days`;
 };
-
-const B36 = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-
-export const makeId = (): string => {
-  let out = "VJ-";
-  for (let i = 0; i < 6; i++)
-    out += B36[Math.floor(Math.random() * B36.length)];
-  return out;
-};
-
-/** Deterministic pseudo hex from a seed string (prototype data). */
-const hex = (seed: string, len: number): string => {
-  let h = 2166136261;
-  let out = "";
-  for (let i = 0; out.length < len; i++) {
-    h = Math.imul(h ^ seed.charCodeAt(i % seed.length) ^ i, 16777619) >>> 0;
-    out += h.toString(16);
-  }
-  return out.slice(0, len);
-};
-
-export const txHashFor = (id: string): string => `0x${hex(`tx:${id}`, 64)}`;
-export const sigFor = (id: string): string => `0x${hex(`sig:${id}`, 130)}`;
-export const blockFor = (id: string): number =>
-  21400000 + (parseInt(hex(`blk:${id}`, 6), 16) % 90000);
