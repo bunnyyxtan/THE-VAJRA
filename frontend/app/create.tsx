@@ -343,9 +343,7 @@ export default function CreateRequest() {
                   style={styles.validRow}
                 >
                   <Ionicons name="checkmark-circle" size={15} color={C.infoBright} />
-                  <Text style={styles.usdText}>
-                    ≈ {fmtUsd(parseFloat(amount), MON_USD)} · prototype rate
-                  </Text>
+                  <Text style={styles.usdText}>Settles on Monad Mainnet</Text>
                 </Animated.View>
               ) : showAmountError ? (
                 <Text testID="create-amount-error" style={styles.amountError}>

@@ -38,7 +38,7 @@ type Phase = "intro" | "registering" | "success" | "cancelled";
 
 export default function PasskeySetup() {
   const router = useRouter();
-  const { passkey, setPasskey } = useVajra();
+  const { passkey, setPasskey, wallet } = useVajra();
   const reduceMotion = useMotionPref();
   const { isDesktop } = useBreakpoint();
   const [phase, setPhase] = useState<Phase>(passkey ? "success" : "intro");
@@ -47,15 +47,55 @@ export default function PasskeySetup() {
 
   const finishRegistration = async (method: "passkey" | "wallet-signature") => {
     setPhase("registering");
-    await delay(1100);
-    setPasskey({
-      name: method === "passkey" ? "Vajra Touch" : "Wallet signature",
-      device: "This device",
-      createdAt: new Date().toISOString(),
-      method,
-    });
-    triggerHaptic("success");
-    setPhase("success");
+    try {
+      if (method === "passkey") {
+        const { isWebAuthnAvailable, createPasskeyCredential } = await import(
+          "@/src/lib/web3/passkey"
+        );
+        const { getVajraWallet } = await import("@/src/lib/web3/wallet");
+        const { buildRegisterPasskeyTx, readPasskeyOf } = await import(
+          "@/src/lib/web3/contracts"
+        );
+        const { getPublicClient } = await import("@/src/lib/web3/client");
+        if (!isWebAuthnAvailable()) {
+          setPhase("intro");
+          setUnsupportedOpen(true);
+          return;
+        }
+        if (!wallet) {
+          setPhase("intro");
+          setCeremonyOpen(true);
+          return;
+        }
+        const vw = getVajraWallet();
+        const account = await vw.currentAccount();
+        if (!account) throw new Error("wallet disconnected");
+        if (account.chainId !== 143) await vw.switchToMonad();
+        const cred = await createPasskeyCredential(account.address);
+        const tx = buildRegisterPasskeyTx(cred);
+        await vw.sendTransaction(account.address, tx);
+        const onchain = await readPasskeyOf(getPublicClient(), account.address);
+        if (!onchain.active) throw new Error("registration not confirmed");
+        setPasskey({
+          name: "Vajra Touch",
+          device: "This device",
+          createdAt: new Date().toISOString(),
+          method,
+        });
+      } else {
+        setPasskey({
+          name: "Wallet signature",
+          device: "This device",
+          createdAt: new Date().toISOString(),
+          method,
+        });
+      }
+      triggerHaptic("success");
+      setPhase("success");
+    } catch (err) {
+      setPhase("intro");
+      setUnsupportedOpen(true);
+    }
   };
 
   return (

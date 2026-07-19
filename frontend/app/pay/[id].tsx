@@ -27,6 +27,7 @@ import { VALIDATION_CODE } from "@/src/lib/web3/vajra/types";
 import { getVajraWallet } from "@/src/lib/web3/wallet";
 import type { Address } from "viem";
 const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+import { useToast } from "@/src/components/Toast";
 import { useMotionPref, useVajra } from "@/src/state/vajra";
 import { C, F, R, S, cardShadow } from "@/src/theme";
 
@@ -45,6 +46,7 @@ export default function VerifyAndPay() {
   const { getRequest, wallet, setWallet, setWalletNetwork, settings, updateRequest } =
     useVajra();
   const reduceMotion = useMotionPref();
+  const { toast } = useToast();
   const { isDesktop } = useBreakpoint();
 
   const request = id ? getRequest(String(id)) : undefined;
@@ -124,6 +126,28 @@ export default function VerifyAndPay() {
     if (token !== runToken.current) return;
 
     try {
+      if (!request.payload && request.scenario) {
+        // deterministic sample preview — staged reveal, designed outcome,
+        // no onchain verification claimed
+        for (let i = 0; i < fields.length; i++) {
+          setFieldStates((prev) => prev.map((st, j) => (j === i ? "verifying" : st)));
+          await delay(reduceMotion ? 40 : 140);
+          if (token !== runToken.current) return;
+          if (request.scenario === "invalid-signature" && i === fields.length - 1) {
+            setFieldStates(fields.map(() => "broken"));
+            triggerHaptic("error");
+            setPhase("broken");
+            return;
+          }
+          setFieldStates((prev) => prev.map((st, j) => (j === i ? "verified" : st)));
+        }
+        if (request.scenario === "rpc-unavailable") setPhase("unavailable");
+        else if (request.scenario === "expired") setPhase("expired");
+        else if (request.scenario === "revoked") setPhase("revoked");
+        else if (request.scenario === "already-paid") setPhase("paid");
+        else setPhase("ready");
+        return;
+      }
       if (!request.payload) {
         setPhase("broken");
         return;
@@ -229,6 +253,10 @@ export default function VerifyAndPay() {
           disabledReason={payBlocker || undefined}
           onPress={async () => {
             if (paying) return;
+            if (!request.payload) {
+              toast("Sample request — create and share a real Vajra request to pay onchain.");
+              return;
+            }
             setPaying(true);
             try {
               const config = getChainConfig();
