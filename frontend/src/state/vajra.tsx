@@ -15,6 +15,7 @@ import type {
   Settings,
   Wallet,
 } from "@/src/lib/types";
+import { SAMPLE_REQUESTS } from "@/src/lib/samples";
 import { storage } from "@/src/utils/storage";
 
 const K = {
@@ -130,7 +131,7 @@ export function VajraProvider({ children }: { children: React.ReactNode }) {
 
   const getRequest = useCallback(
     (id: string): PaymentRequest | undefined =>
-      requestsRef.current.find((x) => x.id === id),
+      requestsRef.current.find((x) => x.id === id) ?? SAMPLE_REQUESTS[id],
     [],
   );
 

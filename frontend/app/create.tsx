@@ -34,6 +34,7 @@ import { computeRequestId, paymentRequestTypedData } from "@/src/lib/web3/vajra/
 import { encodePayload, walletShareProof } from "@/src/lib/web3/vajra/encode";
 import { memoHashOf, MIN_LIFETIME_SECONDS, MAX_LIFETIME_SECONDS, ANY_PAYER } from "@/src/lib/web3/vajra/domain";
 import { getVajraWallet } from "@/src/lib/web3/wallet";
+import { vajraCodeFromRequestId } from "@/src/lib/web3/vajra/fingerprint";
 import { getAddress, type Address } from "viem";
 
 const MON_USD = 3.42; // display-only estimate
@@ -578,9 +579,11 @@ export default function CreateRequest() {
               testID="create-vajra-code"
             >
               <Text style={styles.codeLabel}>YOUR VAJRA CODE</Text>
-              <Text style={styles.codeValue}>{createdRef.current.id}</Text>
+              <Text style={styles.codeValue}>
+                {vajraCodeFromRequestId(createdRef.current.id as `0x${string}`)}
+              </Text>
               <Text style={styles.codeSub}>
-                Authenticated with {passkey?.name || "Vajra Touch"} ·{" "}
+                Signed with your wallet ·{" "}
                 {fmtDateTime(createdRef.current.createdAt)}
               </Text>
             </Animated.View>
@@ -681,7 +684,7 @@ export default function CreateRequest() {
                 ]}
               >
                 {phase === "locked"
-                  ? "LOCKED · VAJRA TOUCH"
+                  ? "LOCKED · WALLET SIGNED"
                   : "LOCKS WHEN YOU AUTHENTICATE"}
               </Text>
             </View>
