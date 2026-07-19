@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope, IBM_Plex_Mono } from "next/font/google";
+import { Providers } from "@/components/providers";
+import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -42,7 +44,10 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body className={`${manrope.variable} ${plexMono.variable}`}>
-        {children}
+        <Providers>
+          <SiteHeader />
+          {children}
+        </Providers>
       </body>
     </html>
   );
