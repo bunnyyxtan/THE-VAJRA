@@ -13,6 +13,7 @@ export function Skeleton({
   shimmer = true,
   label = "Loading",
   style,
+  className,
 }: {
   variant?: "text" | "row" | "block";
   width?: number | string;
@@ -21,10 +22,12 @@ export function Skeleton({
   shimmer?: boolean;
   label?: string;
   style?: CSSProperties;
+  /** Extra geometry classes (e.g. responsive height overrides). */
+  className?: string;
 }) {
   return (
     <div
-      className={`skeleton skeleton--${variant}${shimmer ? " skeleton--shimmer" : ""}`}
+      className={`skeleton skeleton--${variant}${shimmer ? " skeleton--shimmer" : ""}${className ? ` ${className}` : ""}`}
       role="status"
       aria-label={label}
       style={{
