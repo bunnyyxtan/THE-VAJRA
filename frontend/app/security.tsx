@@ -12,7 +12,7 @@ import { useToast } from "@/src/components/Toast";
 import { ConnectWalletSheet } from "@/src/components/WalletSheets";
 import { useBreakpoint } from "@/src/hooks/use-breakpoint";
 import { fmtDateTime, shortAddr } from "@/src/lib/format";
-import { delay } from "@/src/lib/mock";
+const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 import { useVajra } from "@/src/state/vajra";
 import { C, F, MONO, R, S, softShadow } from "@/src/theme";
 

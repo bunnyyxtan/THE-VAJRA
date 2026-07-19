@@ -13,7 +13,7 @@ import { EmptyState, ErrorCard } from "@/src/components/StateViews";
 import { useToast } from "@/src/components/Toast";
 import { WalletConfirmSheet } from "@/src/components/WalletSheets";
 import { blockFor, fmtMon, shortAddr, shortHash, txHashFor } from "@/src/lib/format";
-import { delay } from "@/src/lib/mock";
+const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 import { useMotionPref, useVajra } from "@/src/state/vajra";
 import { C, F, MONO, R, S, cardShadow } from "@/src/theme";
 
@@ -29,7 +29,7 @@ const STAGE_DEFS: { key: StageKey; label: string; desc: string }[] = [
 ];
 
 export default function TransactionProgress() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, tx: txParam } = useLocalSearchParams<{ id: string; tx?: string }>();
   const router = useRouter();
   const { getRequest, updateRequest, wallet } = useVajra();
   const { toast } = useToast();
@@ -64,12 +64,64 @@ export default function TransactionProgress() {
     if (!request || started.current) return;
     started.current = true;
     (async () => {
-      set("prepare", "active");
-      await delay(speed(900));
-      if (!alive.current) return;
+      const hash = (txParam || request.txHash) as string | undefined;
+      if (!hash) {
+        // no real transaction in flight — nothing to track honestly
+        setPhase("uncertain");
+        return;
+      }
       set("prepare", "done");
-      set("wallet", "active");
-      setWalletSheetOpen(true);
+      set("wallet", "done");
+      setTxHash(hash);
+      set("broadcast", "active");
+      try {
+        const { getPublicClient } = await import("@/src/lib/web3/client");
+        const { getChainConfig } = await import("@/src/lib/web3/chain");
+        const config = getChainConfig();
+        const client = getPublicClient(config);
+        set("broadcast", "done");
+        set("included", "active");
+        const receipt = await client.waitForTransactionReceipt({
+          hash: hash as `0x${string}`,
+          timeout: 120_000,
+        });
+        if (!alive.current) return;
+        if (receipt.status !== "success") {
+          set("included", "failed");
+          setPhase("rejected");
+          return;
+        }
+        setBlock(Number(receipt.blockNumber));
+        set("included", "done");
+        set("finality", "active");
+        // finality: wait for the finalized tag to cover the tx block when
+        // available, else a short labeled confirmation delay
+        try {
+          const finalized = await client.getBlock({ blockTag: "finalized" });
+          if (finalized.number < receipt.blockNumber) {
+            await delay(3000);
+          }
+        } catch {
+          await delay(3000); // finalized tag unavailable — labeled fallback
+        }
+        if (!alive.current) return;
+        const now = new Date().toISOString();
+        updateRequest(request.id, {
+          status: "paid",
+          txHash: hash,
+          paidBy: wallet?.address,
+          paidAt: now,
+          finalizedAt: now,
+          blockNumber: Number(receipt.blockNumber),
+        });
+        set("finality", "done");
+        triggerHaptic("success");
+        setPhase("final");
+      } catch (err) {
+        if (!alive.current) return;
+        setPhase("uncertain");
+        setLastChecked(new Date().toLocaleTimeString());
+      }
     })();
     return () => {
       alive.current = false;

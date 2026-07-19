@@ -10,7 +10,10 @@ import QRScannerModal from "@/src/components/QRScanner";
 import Screen from "@/src/components/Screen";
 import { useToast } from "@/src/components/Toast";
 import { useBreakpoint } from "@/src/hooks/use-breakpoint";
-import { SCENARIO_LIST } from "@/src/lib/mock";
+import { getChainConfig } from "@/src/lib/web3/chain";
+import { decodePayload } from "@/src/lib/web3/vajra/decode";
+import { computeRequestId } from "@/src/lib/web3/vajra/hash";
+import { formatUnits } from "viem";
 import { useVajra } from "@/src/state/vajra";
 import { C, F, MONO, R, S } from "@/src/theme";
 
@@ -21,7 +24,7 @@ const extractCode = (raw: string): string | null => {
 
 export default function OpenLink() {
   const router = useRouter();
-  const { getRequest } = useVajra();
+  const { getRequest, addRequest } = useVajra();
   const { toast } = useToast();
   const { isDesktop } = useBreakpoint();
   const [input, setInput] = useState("");
@@ -29,27 +32,47 @@ export default function OpenLink() {
   const [scannerOpen, setScannerOpen] = useState(false);
 
   const open = () => {
-    const code = extractCode(input);
-    if (!code) {
+    const raw = input.trim();
+    const hashIndex = raw.indexOf("#");
+    const fragment = hashIndex >= 0 ? raw.slice(hashIndex + 1) : raw;
+    try {
+      const config = getChainConfig();
+      const decoded = decodePayload(fragment, {
+        chainId: config.chainId,
+        verifyingContract: config.contractAddress,
+      });
+      const requestId = computeRequestId(decoded.request);
+      addRequest({
+        id: requestId,
+        amountMon: formatUnits(decoded.request.amount, 18),
+        recipient: decoded.request.recipient,
+        memo: decoded.memo,
+        network: "Monad Mainnet",
+        contract: config.contractAddress,
+        createdAt: new Date(Number(decoded.request.issuedAt) * 1000).toISOString(),
+        expiresAt: new Date(Number(decoded.request.expiresAt) * 1000).toISOString(),
+        restrictedPayer:
+          decoded.request.payer === "0x0000000000000000000000000000000000000000"
+            ? null
+            : decoded.request.payer.toLowerCase(),
+        status: "active",
+        authMethod: decoded.request.authMode === 1 ? "passkey" : "wallet-signature",
+        signature: requestId,
+        payload: fragment,
+      });
+      setError(null);
+      router.push(`/pay/${requestId}` as never);
+    } catch {
       setError(
-        "This does not look like a Vajra link. Paste the full link (vajra.link/r/…) or the request code. Nothing was paid.",
+        "This link is invalid or was altered. Nothing was verified and no money moved — ask the sender for a fresh Vajra link.",
       );
-      return;
     }
-    if (!getRequest(code)) {
-      setError(
-        "No request found for that code. Check the link with the sender and try again. No money moved.",
-      );
-      return;
-    }
-    setError(null);
-    router.push(`/pay/${code}` as never);
   };
 
   const handleScannedCode = (code: string): boolean => {
-    if (!getRequest(code)) return false;
+    setInput(code);
     setScannerOpen(false);
-    router.push(`/pay/${code}` as never);
+    setTimeout(() => open(), 50);
     return true;
   };
 
@@ -161,32 +184,24 @@ export default function OpenLink() {
       {!isDesktop ? <View style={styles.divider} /> : null}
       <View style={isDesktop ? styles.colAside : undefined}>
       <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>Sample requests</Text>
+        <Text style={styles.sectionTitle}>Before you pay</Text>
         <View style={styles.sectionRule} />
       </View>
-      <Text style={styles.sectionSub}>
-        Preview every request state with deterministic sample data.
-      </Text>
       <View style={{ gap: S.sm, marginTop: S.md }}>
-        {SCENARIO_LIST.map((s) => (
-          <PressableScale
-            key={s.id}
-            testID={`scenario-${s.id}`}
-            accessibilityLabel={`Open sample: ${s.title}`}
-            onPress={() => router.push(`/pay/${s.id}` as never)}
-            style={styles.scenarioRow}
-            haptic={null}
-            scaleTo={0.99}
-          >
-            <View style={[styles.scenarioIcon, { backgroundColor: toneBg[s.tone] }]}>
-              <Ionicons name={toneIcon[s.tone]} size={17} color={toneColor[s.tone]} />
+        {[
+          ["shield-checkmark", "Signed by the recipient", "Every term is authenticated before you connect a wallet."],
+          ["lock-closed", "Exact amount, once", "The contract settles the signed amount a single time."],
+          ["flash", "Final on Monad", "The receipt is sealed from real chain state."],
+        ].map(([icon, title, body]) => (
+          <View key={title as string} style={styles.scenarioRow}>
+            <View style={[styles.scenarioIcon, { backgroundColor: C.lavenderSoft }]}>
+              <Ionicons name={icon as never} size={17} color={C.brand} />
             </View>
             <View style={styles.scenarioText}>
-              <Text style={styles.scenarioTitle}>{s.title}</Text>
-              <Text style={styles.scenarioDesc}>{s.desc}</Text>
+              <Text style={styles.scenarioTitle}>{title}</Text>
+              <Text style={styles.scenarioDesc}>{body}</Text>
             </View>
-            <Text style={styles.scenarioCode}>{s.id}</Text>
-          </PressableScale>
+          </View>
         ))}
       </View>
       </View>

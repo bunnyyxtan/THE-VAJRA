@@ -19,7 +19,14 @@ import {
   shortHash,
   timeUntil,
 } from "@/src/lib/format";
-import { delay } from "@/src/lib/mock";
+import { getChainConfig } from "@/src/lib/web3/chain";
+import { getPublicClient } from "@/src/lib/web3/client";
+import { inspectRequest, buildFulfillTx } from "@/src/lib/web3/contracts";
+import { decodePayload } from "@/src/lib/web3/vajra/decode";
+import { VALIDATION_CODE } from "@/src/lib/web3/vajra/types";
+import { getVajraWallet } from "@/src/lib/web3/wallet";
+import type { Address } from "viem";
+const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 import { useMotionPref, useVajra } from "@/src/state/vajra";
 import { C, F, R, S, cardShadow } from "@/src/theme";
 
@@ -35,7 +42,7 @@ type Phase =
 export default function VerifyAndPay() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { getRequest, wallet, setWallet, setWalletNetwork, settings } =
+  const { getRequest, wallet, setWallet, setWalletNetwork, settings, updateRequest } =
     useVajra();
   const reduceMotion = useMotionPref();
   const { isDesktop } = useBreakpoint();
@@ -116,46 +123,53 @@ export default function VerifyAndPay() {
     await delay(reduceMotion ? 300 : 800);
     if (token !== runToken.current) return;
 
-    if (settings.outage || request.scenario === "rpc-unavailable") {
-      setPhase("unavailable");
-      return;
-    }
-
-    // deterministic wrong-network sample: a connected wallet reports the
-    // wrong chain once for this request (runs after hydration settles)
-    if (request.scenario === "wrong-network" && !netDemoDone.current) {
-      const w = walletRef.current;
-      if (w && w.network === "Monad Mainnet") {
-        netDemoDone.current = true;
-        setWalletNetwork("Ethereum Mainnet");
-      }
-    }
-
-    const bad = request.scenario === "invalid-signature";
-    for (let i = 0; i < fields.length; i++) {
-      const isSig = i === fields.length - 1;
-      setFieldStates((prev) => prev.map((s, j) => (j === i ? "verifying" : s)));
-      await delay(reduceMotion ? 40 : isSig ? 420 : 190);
-      if (token !== runToken.current) return;
-      if (bad && isSig) {
-        // the handshake breaks — every protected field is no longer trustworthy
-        setFieldStates(fields.map(() => "broken"));
-        triggerHaptic("error");
+    try {
+      if (!request.payload) {
         setPhase("broken");
         return;
       }
-      setFieldStates((prev) => prev.map((s, j) => (j === i ? "verified" : s)));
-    }
+      const config = getChainConfig();
+      const decoded = decodePayload(request.payload, {
+        chainId: config.chainId,
+        verifyingContract: config.contractAddress,
+      });
+      const proof = decoded.proof;
+      const client = getPublicClient(config);
+      const payer = (walletRef.current?.address ??
+        "0x0000000000000000000000000000000000000000") as Address;
 
-    if (request.status === "expired" || request.scenario === "expired")
-      setPhase("expired");
-    else if (request.status === "revoked" || request.scenario === "revoked")
-      setPhase("revoked");
-    else if (request.status === "paid" || request.scenario === "already-paid")
-      setPhase("paid");
-    else setPhase("ready");
+      // staged field reveal preserved from the design; the check itself is
+      // one authoritative onchain inspect call
+      for (let i = 0; i < fields.length; i++) {
+        setFieldStates((prev) => prev.map((st, j) => (j === i ? "verifying" : st)));
+        await delay(reduceMotion ? 40 : 140);
+        if (token !== runToken.current) return;
+        setFieldStates((prev) => prev.map((st, j) => (j === i ? "verified" : st)));
+      }
+
+      const { code } = await inspectRequest(client, decoded.request, proof, payer, config);
+      if (token !== runToken.current) return;
+
+      if (code === VALIDATION_CODE.Expired) setPhase("expired");
+      else if (code === VALIDATION_CODE.Revoked) setPhase("revoked");
+      else if (code === VALIDATION_CODE.AlreadyPaid) setPhase("paid");
+      else if (code === VALIDATION_CODE.Valid || code === VALIDATION_CODE.WrongPayer) setPhase("ready");
+      else {
+        setFieldStates(fields.map(() => "broken"));
+        triggerHaptic("error");
+        setPhase("broken");
+      }
+    } catch (err) {
+      if (token !== runToken.current) return;
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("RPC") || msg.includes("fetch") || msg.includes("timeout") || msg.includes("network")) {
+        setPhase("unavailable");
+      } else {
+        setPhase("broken");
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [request?.id, request?.status, settings.outage, fields.length, reduceMotion]);
+  }, [request?.id, request?.status, fields.length, reduceMotion]);
 
   useFocusEffect(
     useCallback(() => {
@@ -213,10 +227,27 @@ export default function VerifyAndPay() {
           loadingLabel="Opening wallet…"
           disabled={Boolean(payBlocker)}
           disabledReason={payBlocker || undefined}
-          onPress={() => {
+          onPress={async () => {
             if (paying) return;
             setPaying(true);
-            router.push(`/progress/${request.id}` as never);
+            try {
+              const config = getChainConfig();
+              const decoded = decodePayload(request.payload!, {
+                chainId: config.chainId,
+                verifyingContract: config.contractAddress,
+              });
+              const proof = decoded.proof;
+              const vw = getVajraWallet();
+              const account = await vw.currentAccount();
+              if (!account) throw new Error("wallet disconnected");
+              if (account.chainId !== 143) await vw.switchToMonad();
+              const tx = buildFulfillTx(decoded.request, proof, config);
+              const hash = await vw.sendTransaction(account.address, tx);
+              updateRequest(request.id, { txHash: hash });
+              router.push((`/progress/${request.id}?tx=${hash}`) as never);
+            } catch (err) {
+              setPaying(false);
+            }
           }}
           testID="pay-button"
         />

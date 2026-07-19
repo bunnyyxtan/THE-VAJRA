@@ -12,6 +12,8 @@ import { getVajraWallet } from "@/src/lib/web3/wallet";
 import { useMotionPref } from "@/src/state/vajra";
 import { C, F, MONO, R, S } from "@/src/theme";
 
+const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
 // ——— Connect wallet (real injected wallet on web) ———
 
 export function ConnectWalletSheet({
@@ -331,6 +333,7 @@ const styles = StyleSheet.create({
   walletText: { flex: 1 },
   walletName: { fontFamily: F.semi, fontSize: 15, color: C.ink },
   walletAddr: { fontFamily: MONO, fontSize: 12, color: C.inkFaint, marginTop: 2 },
+  errorText: { fontFamily: F.med, fontSize: 13, color: C.error, marginTop: S.sm },
   center: { alignItems: "center", paddingVertical: S.md },
   phaseTitle: {
     fontFamily: F.display,

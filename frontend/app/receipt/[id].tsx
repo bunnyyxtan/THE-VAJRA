@@ -13,7 +13,15 @@ import { EmptyState } from "@/src/components/StateViews";
 import { useToast } from "@/src/components/Toast";
 import { useBreakpoint } from "@/src/hooks/use-breakpoint";
 import { fmtDateTime, fmtMon, shortAddr, shortHash } from "@/src/lib/format";
-import { explorerTx, linkFor } from "@/src/lib/mock";
+import { getChainConfig } from "@/src/lib/web3/chain";
+const explorerTx = (hash: string): string =>
+  `${getChainConfig().explorerUrl}/tx/${hash}`;
+const linkFor = (id: string): string => {
+  if (typeof window !== "undefined" && (window as any).location) {
+    return `${(window as any).location.origin}/receipt/${id}`;
+  }
+  return `https://vajra.xyz/receipt/${id}`;
+};
 import { useMotionPref, useVajra } from "@/src/state/vajra";
 import { C, F, MONO, R, S } from "@/src/theme";
 

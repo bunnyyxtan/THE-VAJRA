@@ -6,7 +6,7 @@ import RequestRow from "@/src/components/RequestRow";
 import Screen, { ChipRow } from "@/src/components/Screen";
 import Skeleton from "@/src/components/Skeleton";
 import { EmptyState, SectionError } from "@/src/components/StateViews";
-import { delay } from "@/src/lib/mock";
+const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 import type { RequestStatus } from "@/src/lib/types";
 import { useVajra } from "@/src/state/vajra";
 import { C, R, S } from "@/src/theme";

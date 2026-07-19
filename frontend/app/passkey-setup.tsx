@@ -12,7 +12,7 @@ import { ErrorCard } from "@/src/components/StateViews";
 import { VajraTouchSheet } from "@/src/components/WalletSheets";
 import { useBreakpoint } from "@/src/hooks/use-breakpoint";
 import { fmtDateTime } from "@/src/lib/format";
-import { delay } from "@/src/lib/mock";
+const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 import { useMotionPref, useVajra } from "@/src/state/vajra";
 import { C, F, R, S, cardShadow } from "@/src/theme";
 

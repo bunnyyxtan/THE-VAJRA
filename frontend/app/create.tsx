@@ -26,11 +26,18 @@ import {
   fmtMon,
   fmtUsd,
   isHexAddress,
-  makeId,
   shortAddr,
-  sigFor,
 } from "@/src/lib/format";
-import { MON_USD, VAJRA_CONTRACT, delay } from "@/src/lib/mock";
+import { getChainConfig } from "@/src/lib/web3/chain";
+import { parseDecimalToUnits } from "@/src/lib/web3/amount";
+import { computeRequestId, paymentRequestTypedData } from "@/src/lib/web3/vajra/hash";
+import { encodePayload, walletShareProof } from "@/src/lib/web3/vajra/encode";
+import { memoHashOf, MIN_LIFETIME_SECONDS, MAX_LIFETIME_SECONDS, ANY_PAYER } from "@/src/lib/web3/vajra/domain";
+import { getVajraWallet } from "@/src/lib/web3/wallet";
+import { getAddress, type Address } from "viem";
+
+const MON_USD = 3.42; // display-only estimate
+const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 import type { PaymentRequest } from "@/src/lib/types";
 import { useMotionPref, useVajra } from "@/src/state/vajra";
 import { C, F, MONO, R, S, cardShadow } from "@/src/theme";
@@ -116,8 +123,8 @@ export default function CreateRequest() {
       { label: "Network", value: "Monad Mainnet" },
       {
         label: "Settlement contract",
-        value: shortAddr(VAJRA_CONTRACT),
-        fullValue: VAJRA_CONTRACT,
+        value: shortAddr(getChainConfig().contractAddress),
+        fullValue: getChainConfig().contractAddress,
         mono: true,
       },
       {
@@ -137,33 +144,81 @@ export default function CreateRequest() {
 
   const startLocking = async () => {
     setPhase("locking");
-    const id = makeId();
-    for (let i = 1; i <= reviewFields.length; i++) {
-      // terms visibly lock one by one after authentication
-      await delay(reduceMotion ? 30 : 160);
-      setLockedCount(i);
+    try {
+      const config = getChainConfig();
+      const recipient = getAddress(wallet!.address);
+      const payer =
+        restrictPayer && payerValid ? getAddress(payerAddr.trim()) : ANY_PAYER;
+      const amountWei = parseDecimalToUnits(amount.trim(), 18);
+      if (amountWei === null || amountWei <= 0n) throw new Error("bad amount");
+      const issuedAt = BigInt(Math.floor(Date.now() / 1000));
+      const expiresAtSec = expiresAtIso
+        ? BigInt(Math.floor(new Date(expiresAtIso).getTime() / 1000))
+        : issuedAt + MAX_LIFETIME_SECONDS;
+      if (expiresAtSec - issuedAt < MIN_LIFETIME_SECONDS)
+        throw new Error("lifetime too short");
+      const nonceBytes = new Uint8Array(32);
+      globalThis.crypto.getRandomValues(nonceBytes);
+      const nonce = ("0x" + Array.from(nonceBytes, (b) => b.toString(16).padStart(2, "0")).join("")) as `0x${string}`;
+      const memoText = memo.trim();
+      const contractReq = {
+        recipient,
+        payer,
+        amount: amountWei,
+        issuedAt,
+        expiresAt: expiresAtSec,
+        nonce,
+        memoHash: memoHashOf(memoText),
+        authMode: 0 as const,
+        authVersion: 0,
+      };
+      const typedData = paymentRequestTypedData(contractReq);
+      const vw = getVajraWallet();
+      if (typedData.domain.chainId !== 143) throw new Error("bad domain");
+      const account = await vw.currentAccount();
+      if (!account) throw new Error("wallet disconnected");
+      if (account.chainId !== 143) await vw.switchToMonad();
+      const signature = await vw.signTypedData(account.address, typedData);
+      const requestId = computeRequestId(contractReq);
+      const payload = encodePayload({
+        chainId: config.chainId,
+        verifyingContract: config.contractAddress,
+        request: contractReq,
+        memo: memoText,
+        proof: walletShareProof(signature),
+      });
+      const id = requestId;
+      for (let i = 1; i <= reviewFields.length; i++) {
+        // terms visibly lock one by one after authentication
+        await delay(reduceMotion ? 30 : 160);
+        setLockedCount(i);
+      }
+      const req: PaymentRequest = {
+        id,
+        amountMon: amount.trim(),
+        recipient,
+        recipientLabel: "You",
+        memo: memoText || undefined,
+        network: "Monad Mainnet",
+        contract: config.contractAddress,
+        createdAt: new Date().toISOString(),
+        expiresAt: expiresAtIso,
+        restrictedPayer: payer === ANY_PAYER ? null : payer.toLowerCase(),
+        status: "active",
+        authMethod: "wallet-signature",
+        signature,
+        mine: true,
+        payload,
+      };
+      createdRef.current = req;
+      addRequest(req);
+      await delay(300);
+      triggerHaptic("success");
+      setPhase("locked");
+    } catch (err) {
+      setPhase("review");
+      setAuthCancelled(true);
     }
-    const req: PaymentRequest = {
-      id,
-      amountMon: amount.trim(),
-      recipient: wallet!.address,
-      recipientLabel: "You",
-      memo: memo.trim() || undefined,
-      network: "Monad Mainnet",
-      contract: VAJRA_CONTRACT,
-      createdAt: new Date().toISOString(),
-      expiresAt: expiresAtIso,
-      restrictedPayer: restrictPayer && payerValid ? payerAddr.trim().toLowerCase() : null,
-      status: "active",
-      authMethod: passkey?.method === "wallet-signature" ? "wallet-signature" : "passkey",
-      signature: sigFor(id),
-      mine: true,
-    };
-    createdRef.current = req;
-    addRequest(req);
-    await delay(300);
-    triggerHaptic("success");
-    setPhase("locked");
   };
 
   const goBack = () => {

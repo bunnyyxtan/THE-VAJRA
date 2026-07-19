@@ -34,6 +34,8 @@ export interface PaymentRequest {
   paidAt?: string;
   finalizedAt?: string;
   blockNumber?: number;
+  /** base64url share payload (open-link fragment) */
+  payload?: string;
 }
 
 export interface Wallet {

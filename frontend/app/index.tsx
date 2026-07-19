@@ -20,7 +20,6 @@ import { EmptyState, SectionError } from "@/src/components/StateViews";
 import { useToast } from "@/src/components/Toast";
 import { useBreakpoint } from "@/src/hooks/use-breakpoint";
 import { fmtMon, shortAddr } from "@/src/lib/format";
-import { MERCHANT } from "@/src/lib/mock";
 import {
   useMotionPref,
   useTransparencyPref,
@@ -110,11 +109,11 @@ export default function Home() {
           </View>
         </View>
         <Text style={styles.cardAmount}>
-          42.5 <Text style={styles.cardUnit}>MON</Text>
+          0.01 <Text style={styles.cardUnit}>MON</Text>
         </Text>
         <View style={styles.cardToRow}>
           <Text style={styles.cardTo} numberOfLines={1}>
-            to Aster Studio · {shortAddr(MERCHANT)}
+            to {shortAddr("0xEB9c56D1EB7Ff500e10822c5C7A690140Fa7463E")}
           </Text>
           <Ionicons name="checkmark-circle" size={15} color={C.emerald} />
         </View>
