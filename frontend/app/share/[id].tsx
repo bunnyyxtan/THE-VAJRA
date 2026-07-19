@@ -15,7 +15,15 @@ import { EmptyState, ErrorCard } from "@/src/components/StateViews";
 import { useToast } from "@/src/components/Toast";
 import { useBreakpoint } from "@/src/hooks/use-breakpoint";
 import { fmtDateTime, fmtMon, shortAddr, timeUntil } from "@/src/lib/format";
-import { delay, linkFor } from "@/src/lib/mock";
+import { Platform } from "react-native";
+import { getChainConfig } from "@/src/lib/web3/chain";
+import { getVajraWallet } from "@/src/lib/web3/wallet";
+import { buildRevokeTx } from "@/src/lib/web3/contracts";
+import type { PaymentRequest as ContractRequest } from "@/src/lib/web3/vajra/types";
+import { parseDecimalToUnits } from "@/src/lib/web3/amount";
+import { memoHashOf, ANY_PAYER } from "@/src/lib/web3/vajra/domain";
+import { getAddress } from "viem";
+const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 import { useMotionPref, useVajra } from "@/src/state/vajra";
 import { C, F, MONO, R, S, cardShadow } from "@/src/theme";
 
@@ -49,7 +57,11 @@ export default function ShareRequest() {
     );
   }
 
-  const link = linkFor(request.id);
+  const origin =
+    Platform.OS === "web" && typeof window !== "undefined"
+      ? window.location.origin
+      : "https://vajra.xyz";
+  const link = request.payload ? `${origin}/open-link#${request.payload}` : `${origin}/receipt/${request.id}`;
   const remaining = timeUntil(request.expiresAt);
 
   const copyLink = async () => {
@@ -74,12 +86,34 @@ export default function ShareRequest() {
 
   const revoke = async () => {
     setRevoking(true);
-    await delay(900);
-    if (request.mine) updateRequest(request.id, { status: "revoked" });
-    else addRequest({ ...request, status: "revoked" });
-    setRevoking(false);
-    setRevokeOpen(false);
-    triggerHaptic("success");
+    try {
+      if (!request.payload) throw new Error("no payload");
+      const { decodePayload } = await import("@/src/lib/web3/vajra/decode");
+      const decoded = decodePayload(request.payload, {
+        chainId: 143,
+        verifyingContract: getChainConfig().contractAddress,
+      });
+      const vw = getVajraWallet();
+      const account = await vw.currentAccount();
+      if (!account) throw new Error("Connect the recipient wallet to revoke.");
+      if (account.chainId !== 143) await vw.switchToMonad();
+      const tx = buildRevokeTx(decoded.request);
+      await vw.sendTransaction(account.address, tx);
+      if (request.mine) updateRequest(request.id, { status: "revoked" });
+      else addRequest({ ...request, status: "revoked" });
+      setRevoking(false);
+      setRevokeOpen(false);
+      triggerHaptic("success");
+    } catch (err) {
+      setRevoking(false);
+      setRevokeOpen(false);
+      toast(
+        err instanceof Error && err.message.includes("reject")
+          ? "Revoke was rejected in the wallet. Nothing changed onchain."
+          : "Revoke failed. Nothing changed onchain — check the recipient wallet is connected.",
+        "error",
+      );
+    }
   };
 
   return (
