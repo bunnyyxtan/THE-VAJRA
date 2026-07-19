@@ -7,12 +7,12 @@ import Button from "./Button";
 import PressableScale, { triggerHaptic } from "./PressableScale";
 import Sheet from "./Sheet";
 import { fmtMon, shortAddr } from "@/src/lib/format";
-import { DEMO_WALLET, delay } from "@/src/lib/mock";
 import type { Wallet } from "@/src/lib/types";
+import { getVajraWallet } from "@/src/lib/web3/wallet";
 import { useMotionPref } from "@/src/state/vajra";
 import { C, F, MONO, R, S } from "@/src/theme";
 
-// ——— Connect wallet (simulated — no real wallet is contacted) ———
+// ——— Connect wallet (real injected wallet on web) ———
 
 export function ConnectWalletSheet({
   visible,
@@ -26,11 +26,15 @@ export function ConnectWalletSheet({
   forceNetwork?: Wallet["network"];
 }) {
   const [phase, setPhase] = useState<"choose" | "connecting">("choose");
+  const [error, setError] = useState<string | null>(null);
   const alive = useRef(true);
 
   useEffect(() => {
     alive.current = true;
-    if (visible) setPhase("choose");
+    if (visible) {
+      setPhase("choose");
+      setError(null);
+    }
     return () => {
       alive.current = false;
     };
@@ -38,12 +42,34 @@ export function ConnectWalletSheet({
 
   const connect = async () => {
     setPhase("connecting");
-    await delay(1200);
-    if (!alive.current) return;
-    triggerHaptic("success");
-    onConnected({ ...DEMO_WALLET, network: forceNetwork || "Monad Mainnet" });
-    onClose();
+    setError(null);
+    try {
+      const vw = getVajraWallet();
+      const account = await vw.connect();
+      if (account.chainId !== 143) await vw.switchToMonad();
+      if (!alive.current) return;
+      triggerHaptic("success");
+      onConnected({
+        address: account.address,
+        label: "Connected wallet",
+        network: "Monad Mainnet",
+      });
+      onClose();
+    } catch (err) {
+      if (!alive.current) return;
+      setPhase("choose");
+      setError(
+        err instanceof Error && err.message.includes("reject")
+          ? "Connection was rejected in the wallet. Nothing changed — you can retry safely."
+          : err instanceof Error
+            ? err.message
+            : "Wallet connection failed. Retry or try another browser wallet.",
+      );
+    }
   };
+
+  const available =
+    typeof window !== "undefined" && getVajraWallet().isAvailable();
 
   return (
     <Sheet
@@ -56,35 +82,36 @@ export function ConnectWalletSheet({
       {phase === "choose" ? (
         <View>
           <Text style={styles.caption}>
-            Prototype build. No real wallet is contacted. The demo wallet
-            signs in instantly.
+            Connect the wallet that creates or pays requests on Monad Mainnet.
           </Text>
-          <PressableScale
-            testID="wallet-option-demo"
-            accessibilityLabel="Connect Vajra Demo Wallet"
-            onPress={connect}
-            style={styles.walletRow}
-          >
-            <View style={[styles.walletIcon, { backgroundColor: C.lavenderSoft }]}>
-              <Ionicons name="wallet" size={22} color={C.brand} />
-            </View>
-            <View style={styles.walletText}>
-              <Text style={styles.walletName}>Vajra Demo Wallet</Text>
-              <Text style={styles.walletAddr}>{shortAddr(DEMO_WALLET.address)}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={C.inkFaint} />
-          </PressableScale>
-          {["MetaMask", "WalletConnect"].map((name) => (
-            <View key={name} style={[styles.walletRow, styles.walletRowOff]}>
+          {available ? (
+            <PressableScale
+              testID="wallet-option-injected"
+              accessibilityLabel="Connect browser wallet"
+              onPress={connect}
+              style={styles.walletRow}
+            >
+              <View style={[styles.walletIcon, { backgroundColor: C.lavenderSoft }]}>
+                <Ionicons name="wallet" size={22} color={C.brand} />
+              </View>
+              <View style={styles.walletText}>
+                <Text style={styles.walletName}>Browser wallet</Text>
+                <Text style={styles.walletAddr}>MetaMask or any injected wallet</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={C.inkFaint} />
+            </PressableScale>
+          ) : (
+            <View style={[styles.walletRow, styles.walletRowOff]}>
               <View style={[styles.walletIcon, { backgroundColor: C.surface2 }]}>
                 <Ionicons name="cube-outline" size={22} color={C.inkFaint} />
               </View>
               <View style={styles.walletText}>
-                <Text style={[styles.walletName, { color: C.inkFaint }]}>{name}</Text>
-                <Text style={styles.walletAddr}>Available after real integration</Text>
+                <Text style={[styles.walletName, { color: C.inkFaint }]}>No wallet detected</Text>
+                <Text style={styles.walletAddr}>Install MetaMask or another injected wallet, then retry</Text>
               </View>
             </View>
-          ))}
+          )}
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <Button
             label="Cancel"
             onPress={onClose}

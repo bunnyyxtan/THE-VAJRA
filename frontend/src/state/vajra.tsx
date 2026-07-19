@@ -9,7 +9,6 @@ import React, {
 } from "react";
 import { useReducedMotion } from "react-native-reanimated";
 
-import { DEMO_REQUESTS, seedRequests } from "@/src/lib/mock";
 import type {
   PaymentRequest,
   Passkey,
@@ -75,13 +74,7 @@ export function VajraProvider({ children }: { children: React.ReactNode }) {
       setPasskeyState(parse<Passkey | null>(pk as string | null, null));
       setWalletState(parse<Wallet | null>(wl as string | null, null));
       const stored = parse<PaymentRequest[] | null>(rq as string | null, null);
-      if (stored === null) {
-        const seeded = seedRequests();
-        setRequests(seeded);
-        storage.setItem(K.requests, JSON.stringify(seeded));
-      } else {
-        setRequests(stored);
-      }
+      setRequests(stored ?? []);
       setSettings({
         ...DEFAULT_SETTINGS,
         ...parse<Partial<Settings>>(st as string | null, {}),
@@ -130,9 +123,6 @@ export function VajraProvider({ children }: { children: React.ReactNode }) {
       const existing = list.find((x) => x.id === id);
       if (existing) {
         persistRequests(list.map((x) => (x.id === id ? { ...x, ...patch } : x)));
-      } else if (DEMO_REQUESTS[id]) {
-        // paying a demo request — persist a local copy so the receipt survives
-        persistRequests([{ ...DEMO_REQUESTS[id], ...patch }, ...list]);
       }
     },
     [persistRequests],
@@ -140,7 +130,7 @@ export function VajraProvider({ children }: { children: React.ReactNode }) {
 
   const getRequest = useCallback(
     (id: string): PaymentRequest | undefined =>
-      requestsRef.current.find((x) => x.id === id) ?? DEMO_REQUESTS[id],
+      requestsRef.current.find((x) => x.id === id),
     [],
   );
 
