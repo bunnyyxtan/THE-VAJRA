@@ -1,0 +1,187 @@
+{
+  "app_name": "Vajra",
+  "personality": "1 iOS-Native Clean structure with 5 Brutalist precision and 6 Glass/Luxe overlays",
+  "personality_one_liner": "A calm, premium consumer-finance experience that builds absolute confidence through bright dimensional surfaces, precise typography, and tactile interactions, completely avoiding chaotic crypto cliches.",
+  "color": {
+    "surface": "#FCFBFF",
+    "onSurface": "#0E091C",
+    "surfaceSecondary": "#F3F0F8",
+    "onSurfaceSecondary": "#0E091C",
+    "surfaceTertiary": "#E5E1EF",
+    "onSurfaceTertiary": "#0E091C",
+    "surfaceInverse": "#0E091C",
+    "onSurfaceInverse": "#FCFBFF",
+    "brand": "#6E54FF",
+    "brandPrimary": "#6E54FF",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#DDD7FE",
+    "onBrandSecondary": "#3D26B8",
+    "brandTertiary": "#F1EFFF",
+    "onBrandTertiary": "#6E54FF",
+    "success": "#00D1B2",
+    "onSuccess": "#FFFFFF",
+    "warning": "#FF9A40",
+    "onWarning": "#FFFFFF",
+    "error": "#FF4C6A",
+    "onError": "#FFFFFF",
+    "info": "#00B5FF",
+    "onInfo": "#FFFFFF",
+    "border": "#E5E2EC",
+    "borderStrong": "#0E091C",
+    "divider": "#E5E2EC"
+  },
+  "typography": {
+    "displayFontFamily": "Space Grotesk",
+    "textFontFamily": "Plus Jakarta Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous, breathable, bento-style layouts for non-critical info. Tight, precise, and visually locked layouts for financial amounts and critical verification steps. Sticky bottom actions.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": 1,
+  "navigation": "stack_only",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": true,
+    "do's": [
+      "Use for sticky bottom action bars, floating navigation, bottom-sheet drag handles, and modal scrims.",
+      "Pair blur with a translucent tinted base (e.g. 70% of surface) underneath."
+    ],
+    "dont's": [
+      "NEVER use glassmorphism on financial information, amounts, warnings, or errors. Financial info MUST be on solid, high-contrast surfaces."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Landing/Home",
+      "purpose": "Hero storytelling introducing Vajra's core promise, with clear CTAs to Create Request or Pay.",
+      "states": {
+        "loading": "Skeleton loaders for recent activity.",
+        "empty": "Clean illustration encouraging the user's first request.",
+        "error": "RPC-unavailable state displayed inline."
+      },
+      "layout": "Scroll-linked storytelling elements fading in. Clean bento cards for features. Sticky glass bottom container with primary 'Create Request' button and secondary 'Scan to Pay' icon button."
+    },
+    {
+      "name": "Vajra Touch Setup",
+      "purpose": "A premium ceremony screen to register the user's passkey or wallet signature.",
+      "states": {
+        "loading": "Spinner during passkey registration.",
+        "empty": "N/A",
+        "error": "Inline error explaining if biometric/passkey registration failed and next steps."
+      },
+      "layout": "3D interactive object placeholder at the top (abstract sphere). Large Brutalist typography explaining the security benefit. Sticky bottom primary CTA 'Set up Vajra Touch' that triggers the native passkey sheet."
+    },
+    {
+      "name": "Create Request (Amount -> Terms -> Review)",
+      "purpose": "3-step flow to define payment terms and authenticate them.",
+      "states": {
+        "loading": "Inline loaders during signature generation.",
+        "empty": "N/A",
+        "error": "Validation errors on solid high-contrast backgrounds."
+      },
+      "layout": "Step 1: Huge brutalist typography input for amount. Solid high-contrast background. Step 2: Minimalist list to define terms/recipient. Step 3: Summary card on solid surface. 'Lock & Authenticate' sticky CTA at bottom."
+    },
+    {
+      "name": "Share Request",
+      "purpose": "Display secure link and QR code for the authenticated request.",
+      "states": {
+        "loading": "Generating QR...",
+        "empty": "N/A",
+        "error": "Failed to generate link."
+      },
+      "layout": "Large, crisp, high-contrast QR code on a solid white bento card. One-tap copy button below. Haptic feedback on copy."
+    },
+    {
+      "name": "Verify & Pay",
+      "purpose": "Recipient views the protected details and executes the payment.",
+      "states": {
+        "loading": "Simulated loading to check signature validity.",
+        "empty": "N/A",
+        "error": "Expired, Revoked, Wrong-wallet, Wrong-network, or Invalid-signature errors MUST be explicitly explained. Tampered requests break the visual handshake."
+      },
+      "layout": "Protected details (amount, recipient) inside precise brutalist bordered cards. Each field has a cyan verification mark. Primary bottom CTA 'Verify & Pay'."
+    },
+    {
+      "name": "Transaction Progress",
+      "purpose": "Truthful tracking of transaction stages on Monad.",
+      "states": {
+        "loading": "Active pulsing on the current stage.",
+        "empty": "N/A",
+        "error": "Reverted/Failed stage with clear explanation of whether money moved."
+      },
+      "layout": "Vertical progressive stepper (Wallet -> Broadcast -> Included -> Final). Minimalist styling."
+    },
+    {
+      "name": "Permanent Receipt",
+      "purpose": "Proof of finality on Monad.",
+      "states": {
+        "loading": "N/A",
+        "empty": "N/A",
+        "error": "N/A"
+      },
+      "layout": "Premium 'seal' graphic at the top. Transaction hash and exact timestamps displayed precisely. Share receipt button."
+    },
+    {
+      "name": "Activity",
+      "purpose": "List of all past requests and payments.",
+      "states": {
+        "loading": "Skeleton list items.",
+        "empty": "3D minimal abstract shape illustration. 'No activity yet'.",
+        "error": "Failed to load history, retry button."
+      },
+      "layout": "Clean list view with precise dividers. Each row shows relative time, amount, and clear status badge."
+    }
+  ],
+  "images": {
+    "hero_abstract": {
+      "url": "https://images.unsplash.com/photo-1743557367095-17a6448c7a77?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzN8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMDNkJTIwZ2xhc3MlMjBzcGhlcmUlMjBsaWdodHxlbnwwfHx8fDE3ODQ0ODkxNjV8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "A minimal, bright, transparent abstract 3D glass sphere resting on a curved surface."
+    },
+    "finality_seal": {
+      "url": "https://images.pexels.com/photos/9436715/pexels-photo-9436715.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Abstract 3D render of pastel cubes containing metallic spheres, symbolizing a locked and finalized state."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow the color palette: No dark gradients, no generic purple blobs, no glowing crypto coins. Use Monad Purple #6E54FF and soft lavender for brand surfaces, keeping backgrounds bright and dimensional (#FCFBFF).",
+    "Financial data, amounts, and critical verification info MUST sit on solid, high-contrast surfaces (e.g., surface or surfaceInverse). NEVER use translucent glass for critical financial information.",
+    "Use glassmorphism selectively: ONLY for floating navigation, bottom-sheet drag handles, sticky CTAs, and modal scrims.",
+    "Errors must be explicit and truthful. Never expose raw RPC errors. Translate them into user-friendly explanations (e.g., 'Wrong network', 'Already paid'). Never show a fake payment success.",
+    "Implement brutalist precision for input fields and layout borders (borderStrong: #0E091C).",
+    "Use Space Grotesk for display typography to give a premium, slightly technical feel, and Plus Jakarta Sans for highly readable body text.",
+    "Include verification marks (cyan checks) next to protected fields in the 'Verify & Pay' screen.",
+    "Wire haptics to all primary tactile actions: copy to clipboard, passkey setup success, payment swipe/button."
+  ]
+}
