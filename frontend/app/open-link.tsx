@@ -10,6 +10,7 @@ import QRScannerModal from "@/src/components/QRScanner";
 import Screen from "@/src/components/Screen";
 import { useToast } from "@/src/components/Toast";
 import { useBreakpoint } from "@/src/hooks/use-breakpoint";
+import { SCENARIO_LIST } from "@/src/lib/samples";
 import { getChainConfig } from "@/src/lib/web3/chain";
 import { decodePayload } from "@/src/lib/web3/vajra/decode";
 import { computeRequestId } from "@/src/lib/web3/vajra/hash";
@@ -202,6 +203,35 @@ export default function OpenLink() {
               <Text style={styles.scenarioDesc}>{body}</Text>
             </View>
           </View>
+        ))}
+      </View>
+      <View style={[styles.sectionHead, { marginTop: S.xl }]}>
+        <Text style={styles.sectionTitle}>Sample requests</Text>
+        <View style={styles.sectionRule} />
+      </View>
+      <Text style={styles.sectionSub}>
+        Preview every request state with deterministic sample data.
+      </Text>
+      <View style={{ gap: S.sm, marginTop: S.md }}>
+        {SCENARIO_LIST.map((s) => (
+          <PressableScale
+            key={s.id}
+            testID={`scenario-${s.id}`}
+            accessibilityLabel={`Open sample: ${s.title}`}
+            onPress={() => router.push(`/pay/${s.id}` as never)}
+            style={styles.scenarioRow}
+            haptic={null}
+            scaleTo={0.99}
+          >
+            <View style={[styles.scenarioIcon, { backgroundColor: toneBg[s.tone] }]}>
+              <Ionicons name={toneIcon[s.tone]} size={17} color={toneColor[s.tone]} />
+            </View>
+            <View style={styles.scenarioText}>
+              <Text style={styles.scenarioTitle}>{s.title}</Text>
+              <Text style={styles.scenarioDesc}>{s.desc}</Text>
+            </View>
+            <Text style={styles.scenarioCode}>{s.id}</Text>
+          </PressableScale>
         ))}
       </View>
       </View>
