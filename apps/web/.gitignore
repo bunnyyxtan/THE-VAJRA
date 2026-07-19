@@ -1,0 +1,12 @@
+# Next.js build output
+.next/
+out/
+
+# Production
+build/
+
+# Debug logs
+npm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
