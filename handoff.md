@@ -17,10 +17,17 @@ Phase 0 (spec freeze) complete. Phase 1 (contract core) starting now.
 - Constitution process rules apply: ADRs in log.md, small human-voiced commits, tests with every unit.
 
 ## Next 3 actions
-1. Scaffold contracts/ (Foundry): VajraNativeV1 per blueprint §11–14 + unit tests. NO deploy until funded.
+1. Phase 1 DONE: contract live on mainnet, verified, smoke-tested (see log.md).
 2. Verify official Monad mainnet RPC/explorer from docs.monad.xyz; write .env.example + deploy/verify scripts.
 3. After owner funds deployer: run full suite → deploy → verify on explorer → minimum-value smoke tests
    (register passkey registry entry, request, pay, duplicate rejection, receipt check).
 
 ## Hard bans
 No Design.md or styling. No fake success. No committed secrets. No testnet fallbacks in prod config.
+
+## Mainnet facts
+Contract: 0x7d17f2765bb58ceb27b9e1e52b068c72ccb8299f · chain 143 · verified on Sourcify/Monadscan.
+## Next 3 actions (updated)
+1. Phase 2: functional Next.js skeleton (semantic, unstyled) wired to the mainnet contract.
+2. E2E demo script: the 90-second judge flow as an executable test (test gate = demo gate).
+3. Adversarial review loop on VajraNativeV1.sol before any larger amounts move.

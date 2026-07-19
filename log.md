@@ -48,3 +48,15 @@ Never re-decide a logged decision without a new entry explaining why.
 - AI judging agent checks: start time vs hackathon start, static placeholder data, suspicious commits.
 - Consequences: real onchain functionality only; human-voiced commits at natural breakpoints;
   README + demo script mandatory (Phase 6); no fake success paths anywhere (already blueprint law).
+
+## 2026-07-19 — MAINNET DEPLOYMENT COMPLETE
+- Contract: VajraNativeV1 at 0x7d17f2765bb58ceb27b9e1e52b068c72ccb8299f (chain 143).
+- Deploy tx: 0xf8f3ca3eb492329b47855178019b7f1d6859b6ed24532e77fcda953586246495 (3,542,802 gas).
+- Source verified: Sourcify full match (creation + runtime), forwarded to Monadscan.
+- Smoke suite (all real mainnet transactions):
+  registerPasskey 0x2bd0136ae5ec2219496cd18ab0f3b0eb3fa193c9dae1d5816b35e817b86d9c21 (PasskeyRegistered v1);
+  payment 0x94ca84d687b6b3f162b3b96d2d8c329cc0dad91bcbff2288ad18294efc2409a2 (0.00001 MON,
+  PaymentFulfilled, statusOf=Paid, settlement record matches event);
+  duplicate fulfill reverted onchain with RequestAlreadyPaid() (0xc15afa82);
+  revoke 0x102c84c02f9abb9fa1f6330452339c9cda168440e2d77a26a298cf9d26c8e614 (statusOf=Revoked).
+- Deployer holds remaining owner funds; smoke payer 0x3D87aFd58aF733332adEda985836375CC232eFe3 (key in .env).
