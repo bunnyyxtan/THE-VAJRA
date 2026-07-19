@@ -1,0 +1,210 @@
+/* ==========================================================================
+   VAJRA — Activity screen specifics (Ledger grammar). Compact ruled rows,
+   live status pills (icon + text, never color alone), short new-row
+   highlight (800–1200ms, then gone).
+   ========================================================================== */
+
+.activity-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.activity-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Compact ledger rows — ruled separation, no cards. */
+.activity-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--v-border);
+}
+.activity-row:first-child {
+  border-top: 0;
+  padding-top: 4px;
+}
+
+/* New rows insert with a short highlight that fades within ~1s. */
+@media (prefers-reduced-motion: no-preference) {
+  .activity-row--new {
+    animation: activity-new 1000ms var(--sc-ease-standard) both;
+  }
+  @keyframes activity-new {
+    from {
+      background: var(--sc-selected);
+    }
+    to {
+      background: transparent;
+    }
+  }
+}
+
+.activity-row__main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.activity-row__primary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.activity-row__amount {
+  font-size: var(--sc-type-component);
+  font-weight: 700;
+}
+.activity-row__kind {
+  font-size: var(--sc-type-component);
+  font-weight: 600;
+}
+.activity-row__secondary {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.activity-row__memo {
+  font-size: var(--sc-type-compact);
+  color: var(--v-text-2);
+}
+.activity-row__memo--none {
+  color: var(--v-muted);
+}
+.activity-row__meta {
+  font-size: var(--sc-type-meta);
+  color: var(--v-muted);
+}
+.activity-row__hash {
+  font-size: var(--sc-type-compact);
+  color: var(--v-text-2);
+}
+.activity-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.activity-row__link {
+  font-size: var(--sc-type-compact);
+  font-weight: 600;
+  color: var(--v-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .activity-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .activity-row__actions {
+    justify-content: flex-start;
+  }
+}
+
+/* Status pills — dot + label, semantic color paired with text. */
+.activity-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: var(--sc-type-meta);
+  font-weight: 600;
+  border: 1px solid var(--v-border);
+  color: var(--v-text-2);
+  background: var(--v-surface);
+}
+.activity-pill__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--v-muted);
+}
+.activity-pill--open {
+  background: var(--sc-info-surface);
+  border-color: var(--sc-info-border);
+  color: var(--v-text);
+}
+.activity-pill--open .activity-pill__dot {
+  background: var(--v-info);
+}
+.activity-pill--paid {
+  background: var(--sc-success-surface);
+  border-color: var(--sc-success-border);
+  color: var(--v-text);
+}
+.activity-pill--paid .activity-pill__dot {
+  background: var(--v-success);
+}
+.activity-pill--expired,
+.activity-pill--revoked {
+  background: var(--sc-warning-surface);
+  border-color: var(--sc-warning-border);
+  color: var(--v-text);
+}
+.activity-pill--expired .activity-pill__dot,
+.activity-pill--revoked .activity-pill__dot {
+  background: var(--v-warning);
+}
+.activity-pill--unavailable .activity-pill__dot {
+  background: var(--v-muted);
+}
+
+/* Empty state — an invitation to act. */
+.activity-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 56ch;
+  padding: 24px 0;
+}
+.activity-empty__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--sc-radius-lg);
+  border: 1px solid var(--v-border);
+  background: var(--v-surface);
+  color: var(--v-muted);
+}
+.activity-empty__title {
+  font-size: var(--sc-type-section);
+  font-weight: 700;
+  margin: 0;
+}
+.activity-empty__body {
+  font-size: var(--sc-type-body);
+  color: var(--v-text-2);
+  line-height: 1.55;
+  margin: 0;
+}
