@@ -6,7 +6,7 @@ import { C, F, S } from "@/src/theme";
 
 const MAP: Record<RequestStatus, { bg: string; fg: string; label: string }> = {
   active: { bg: C.lavender, fg: C.onLavender, label: "ACTIVE" },
-  paid: { bg: C.successBg, fg: C.success, label: "SETTLED" },
+  paid: { bg: C.emeraldBg, fg: C.emeraldDeep, label: "SETTLED" },
   expired: { bg: C.surface3, fg: C.inkSoft, label: "EXPIRED" },
   revoked: { bg: C.errorBg, fg: C.error, label: "REVOKED" },
 };

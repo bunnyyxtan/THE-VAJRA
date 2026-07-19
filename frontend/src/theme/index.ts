@@ -29,6 +29,15 @@ export const C = {
   infoBright: "#00B5FF",
   infoBg: "#E2F6FF",
   pink: "#FF7AC3",
+  // Secondary accent — emerald. Trust, security, settled money.
+  emerald: "#0DA678",
+  emeraldDeep: "#087A59",
+  emeraldBright: "#19CE9A",
+  emeraldBg: "#DFF6EC",
+  // Warm gold — protection surfaces (Vajra Touch).
+  gold: "#A56A00",
+  goldBright: "#F0B23E",
+  goldBg: "#FBF1DC",
   border: "#E5E2EC",
   borderStrong: "#0E091C",
   white: "#FFFFFF",
@@ -66,4 +75,15 @@ export const cardShadow = {
 } as const;
 export const softShadow = {
   boxShadow: "0px 4px 14px rgba(42,28,107,0.07)",
+} as const;
+
+// Layered premium shadows: hard offset (identity) + ambient depth + inner
+// top highlight so cards read as physical, lit objects instead of flat fills.
+export const premium = {
+  boxShadow:
+    "0px 5px 0px #0E091C, 0px 22px 44px rgba(42,28,107,0.16), inset 0px 1.5px 0px rgba(255,255,255,0.85)",
+} as const;
+export const premiumSm = {
+  boxShadow:
+    "0px 3px 0px #0E091C, 0px 10px 22px rgba(42,28,107,0.09), inset 0px 1px 0px rgba(255,255,255,0.75)",
 } as const;

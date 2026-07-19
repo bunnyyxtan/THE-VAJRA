@@ -6,7 +6,7 @@ import { StyleSheet, Text, View } from "react-native";
 import PressableScale from "./PressableScale";
 import StatusBadge from "./StatusBadge";
 import { fmtMon, timeAgo } from "@/src/lib/format";
-import type { PaymentRequest } from "@/src/lib/types";
+import type { PaymentRequest, RequestStatus } from "@/src/lib/types";
 import { C, F, HAIRLINE, MONO, S } from "@/src/theme";
 
 export function routeForRequest(r: PaymentRequest): string {
@@ -15,7 +15,24 @@ export function routeForRequest(r: PaymentRequest): string {
   return `/pay/${r.id}`;
 }
 
-/** Ledger-style row — hairline dividers, mono figures, no card chrome. */
+const CHIP: Record<RequestStatus, { bg: string; fg: string }> = {
+  active: { bg: C.lavenderSoft, fg: C.brand },
+  paid: { bg: C.emeraldBg, fg: C.emeraldDeep },
+  expired: { bg: C.surface2, fg: C.inkSoft },
+  revoked: { bg: C.errorBg, fg: C.error },
+};
+
+const iconFor = (
+  r: PaymentRequest,
+  incoming: boolean,
+): keyof typeof Ionicons.glyphMap => {
+  if (r.status === "paid") return "checkmark";
+  if (r.status === "expired") return "time-outline";
+  if (r.status === "revoked") return "close";
+  return incoming ? "arrow-down" : "arrow-up";
+};
+
+/** Ledger-style row — status-tinted icon chip, mono figures, hairline dividers. */
 export default function RequestRow({
   request,
   last,
@@ -25,6 +42,7 @@ export default function RequestRow({
 }) {
   const router = useRouter();
   const incoming = Boolean(request.mine);
+  const chip = CHIP[request.status];
 
   return (
     <PressableScale
@@ -35,12 +53,8 @@ export default function RequestRow({
       haptic={null}
       scaleTo={0.99}
     >
-      <View style={styles.icon}>
-        <Ionicons
-          name={incoming ? "arrow-down" : "arrow-up"}
-          size={15}
-          color={C.ink}
-        />
+      <View style={[styles.icon, { backgroundColor: chip.bg }]}>
+        <Ionicons name={iconFor(request, incoming)} size={16} color={chip.fg} />
       </View>
       <View style={styles.mid}>
         <Text style={styles.title} numberOfLines={1}>
@@ -51,7 +65,13 @@ export default function RequestRow({
         </Text>
       </View>
       <View style={styles.right}>
-        <Text style={styles.amount} numberOfLines={1}>
+        <Text
+          style={[
+            styles.amount,
+            request.status === "paid" && { color: C.emeraldDeep },
+          ]}
+          numberOfLines={1}
+        >
           {incoming ? "+" : "−"}
           {fmtMon(request.amountMon)}
           <Text style={styles.unit}> MON</Text>
@@ -67,26 +87,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: S.md,
-    paddingVertical: S.md + 3,
+    paddingVertical: S.lg,
   },
   rowBorder: {
     borderBottomWidth: HAIRLINE,
     borderBottomColor: C.surface3,
   },
   icon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     borderWidth: 1.25,
     borderColor: C.ink,
-    backgroundColor: C.white,
     alignItems: "center",
     justifyContent: "center",
   },
   mid: { flex: 1, minWidth: 0 },
-  title: { fontFamily: F.semi, fontSize: 14.5, color: C.ink },
-  sub: { fontFamily: MONO, fontSize: 10.5, color: C.inkFaint, marginTop: 3 },
-  right: { alignItems: "flex-end", gap: 5 },
-  amount: { fontFamily: F.display, fontSize: 15, color: C.ink },
-  unit: { fontFamily: F.semi, fontSize: 10, color: C.inkFaint },
+  title: { fontFamily: F.semi, fontSize: 15, color: C.ink },
+  sub: { fontFamily: MONO, fontSize: 10.5, color: C.inkFaint, marginTop: 4 },
+  right: { alignItems: "flex-end", gap: 6 },
+  amount: { fontFamily: F.display, fontSize: 16, color: C.ink },
+  unit: { fontFamily: F.semi, fontSize: 10.5, color: C.inkFaint },
 });

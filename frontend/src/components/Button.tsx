@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -101,11 +103,26 @@ export default function Button({
   const p = PALETTE[variant];
   const [pressed, setPressed] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
   const isOff = Boolean(disabled || loading);
+  const isPrimary = variant === "primary" && !disabled;
   const fg = disabled ? p.disabledFg : p.fg;
   const hasShadow = Boolean(p.shadow) && !disabled;
   const sunk = pressed && hasShadow;
   const lifted = hovered && hasShadow && !pressed && !isOff;
+  const shadowStyle = !hasShadow
+    ? null
+    : sunk
+      ? isPrimary
+        ? styles.primarySunk
+        : null
+      : isPrimary
+        ? lifted
+          ? styles.primaryShadowLift
+          : styles.primaryShadow
+        : lifted
+          ? styles.hardShadowLift
+          : styles.hardShadow;
 
   return (
     <View style={style}>
@@ -125,6 +142,8 @@ export default function Button({
           onPressOut={() => setPressed(false)}
           onHoverIn={() => setHovered(true)}
           onHoverOut={() => setHovered(false)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           style={[
             styles.base,
             small ? styles.small : styles.regular,
@@ -135,13 +154,25 @@ export default function Button({
               transform: [{ translateY: sunk ? 3 : lifted ? -1 : 0 }],
               opacity: hovered && !hasShadow && !isOff ? 0.85 : 1,
             },
-            hasShadow && !sunk
-              ? lifted
-                ? styles.hardShadowLift
-                : styles.hardShadow
+            shadowStyle,
+            Platform.OS === "web" && focused && !isOff
+              ? styles.focusRing
               : null,
           ]}
         >
+          {isPrimary ? (
+            <LinearGradient
+              colors={
+                hovered && !pressed
+                  ? ["#8B72FF", "#7259FF", "#5940E6"]
+                  : ["#8268FF", "#6E54FF", "#5940E6"]
+              }
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+          ) : null}
           {loading ? (
             <ActivityIndicator size="small" color={fg} />
           ) : icon ? (
@@ -176,9 +207,27 @@ const styles = StyleSheet.create({
     gap: S.sm,
     borderRadius: 14,
     paddingHorizontal: S.xl,
+    overflow: "hidden",
   },
   hardShadow: { boxShadow: "0px 3px 0px #0E091C" },
   hardShadowLift: { boxShadow: "0px 4px 0px #0E091C" },
+  primaryShadow: {
+    boxShadow:
+      "0px 3px 0px #0E091C, 0px 12px 24px rgba(110,84,255,0.30), inset 0px 1px 0px rgba(255,255,255,0.30)",
+  },
+  primaryShadowLift: {
+    boxShadow:
+      "0px 4px 0px #0E091C, 0px 16px 30px rgba(110,84,255,0.38), inset 0px 1px 0px rgba(255,255,255,0.30)",
+  },
+  primarySunk: {
+    boxShadow: "inset 0px 1px 0px rgba(255,255,255,0.22)",
+  },
+  focusRing: {
+    outlineStyle: "solid",
+    outlineWidth: 2,
+    outlineColor: "rgba(110,84,255,0.55)",
+    outlineOffset: 2,
+  },
   regular: { height: 56 },
   small: { height: 44, paddingHorizontal: S.lg },
   label: { fontFamily: F.bold, letterSpacing: 0.1 },

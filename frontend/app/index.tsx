@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
@@ -52,7 +53,7 @@ export default function Home() {
   const { toast } = useToast();
   const reduceMotion = useMotionPref();
   const reduceTransparency = useTransparencyPref();
-  const { isDesktop, isTablet } = useBreakpoint();
+  const { isDesktop } = useBreakpoint();
 
   const scrollY = useSharedValue(0);
   const onScroll = useAnimatedScrollHandler((e) => {
@@ -63,10 +64,11 @@ export default function Home() {
     if (reduceMotion) return { transform: [{ rotate: "-2.2deg" }] };
     return {
       transform: [
-        { translateY: interpolate(scrollY.value, [0, 300], [0, -22], "clamp") },
+        { translateY: interpolate(scrollY.value, [0, 380], [0, -30], "clamp") },
         {
-          rotate: `${interpolate(scrollY.value, [0, 300], [-2.2, 0.4], "clamp")}deg`,
+          rotate: `${interpolate(scrollY.value, [0, 380], [-2.2, 0.6], "clamp")}deg`,
         },
+        { scale: interpolate(scrollY.value, [0, 380], [1, 1.02], "clamp") },
       ],
     };
   });
@@ -75,9 +77,9 @@ export default function Home() {
     if (reduceMotion) return { transform: [{ rotate: "2.4deg" }] };
     return {
       transform: [
-        { translateY: interpolate(scrollY.value, [0, 300], [0, 14], "clamp") },
+        { translateY: interpolate(scrollY.value, [0, 380], [0, 18], "clamp") },
         {
-          rotate: `${interpolate(scrollY.value, [0, 300], [2.4, 4.5], "clamp")}deg`,
+          rotate: `${interpolate(scrollY.value, [0, 380], [2.4, 5.2], "clamp")}deg`,
         },
       ],
     };
@@ -95,8 +97,16 @@ export default function Home() {
       <Animated.View style={[styles.requestCard, cardStyle]}>
         <View style={styles.cardTopRow}>
           <Text style={styles.cardMicro}>SIGNED REQUEST</Text>
-          <View style={styles.cardSeal}>
-            <Ionicons name="finger-print" size={13} color={C.onBrand} />
+          <View style={styles.cardSealRing}>
+            <LinearGradient
+              colors={["#A78BFF", "#6E54FF", "#19CE9A"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.cardSeal}>
+              <Ionicons name="finger-print" size={13} color={C.onBrand} />
+            </View>
           </View>
         </View>
         <Text style={styles.cardAmount}>
@@ -106,7 +116,7 @@ export default function Home() {
           <Text style={styles.cardTo} numberOfLines={1}>
             to Aster Studio · {shortAddr(MERCHANT)}
           </Text>
-          <Ionicons name="checkmark-circle" size={15} color={C.infoBright} />
+          <Ionicons name="checkmark-circle" size={15} color={C.emerald} />
         </View>
         <View style={styles.cardDashes} />
         <View style={styles.cardBottomRow}>
@@ -161,6 +171,7 @@ export default function Home() {
               />
               <Button
                 label="Create a request"
+                icon="add"
                 small
                 onPress={() => router.push("/create")}
                 testID="home-create-request-button"
@@ -201,6 +212,13 @@ export default function Home() {
       >
         {/* Hero panel */}
         <View style={styles.heroPanel}>
+          <LinearGradient
+            colors={["#F7F4FF", "#EFE9FF", "#E6DFFE"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0.2, y: 1 }}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
           <View style={[styles.heroInner, isDesktop && styles.heroInnerDesktop]}>
             {settings.outage ? (
               <View style={{ marginBottom: S.xl }}>
@@ -247,6 +265,7 @@ export default function Home() {
                   <View style={styles.heroCtaRow}>
                     <Button
                       label="Create a request"
+                      icon="add"
                       onPress={() => router.push("/create")}
                       style={styles.heroCta}
                       testID="home-hero-create-button"
@@ -305,50 +324,69 @@ export default function Home() {
             testID="home-bento-activity"
             accessibilityLabel={`Activity, ${activeCount} active requests`}
             onPress={() => router.push("/activity")}
-            style={[styles.stat, hardSm, isDesktop && styles.statDesktop]}
+            style={[styles.stat, isDesktop && styles.statDesktop]}
             haptic={null}
             scaleTo={0.99}
           >
-            <Text style={[styles.statValue, isDesktop && styles.statValueDesktop]}>
-              {hydrated ? activeCount : "—"}
-            </Text>
-            <Text style={styles.statLabel}>ACTIVE{"\n"}REQUESTS</Text>
+            <View style={[styles.statChip, { backgroundColor: C.lavenderSoft }]}>
+              <Ionicons name="flash" size={17} color={C.brand} />
+            </View>
+            <View style={styles.statBottom}>
+              <Text
+                style={[styles.statValue, isDesktop && styles.statValueDesktop]}
+              >
+                {hydrated ? activeCount : "—"}
+              </Text>
+              <Text style={styles.statLabel}>ACTIVE{"\n"}REQUESTS</Text>
+            </View>
           </PressableScale>
           <PressableScale
             testID="home-bento-settled"
             accessibilityLabel={`${fmtMon(settledMon)} MON settled`}
             onPress={() => router.push("/activity")}
-            style={[styles.stat, hardSm, isDesktop && styles.statDesktop]}
+            style={[styles.stat, isDesktop && styles.statDesktop]}
             haptic={null}
             scaleTo={0.99}
           >
-            <Text style={[styles.statValue, isDesktop && styles.statValueDesktop]}>
-              {hydrated ? fmtMon(settledMon) : "—"}
-            </Text>
-            <Text style={styles.statLabel}>MON{"\n"}SETTLED</Text>
+            <View style={[styles.statChip, { backgroundColor: C.emeraldBg }]}>
+              <Ionicons name="checkmark-done" size={17} color={C.emeraldDeep} />
+            </View>
+            <View style={styles.statBottom}>
+              <Text
+                style={[styles.statValue, isDesktop && styles.statValueDesktop]}
+              >
+                {hydrated ? fmtMon(settledMon) : "—"}
+              </Text>
+              <Text style={styles.statLabel}>MON{"\n"}SETTLED</Text>
+            </View>
           </PressableScale>
           <PressableScale
             testID="home-bento-security"
             accessibilityLabel={`Vajra Touch ${passkey ? "active" : "off"}`}
             onPress={() => router.push("/security")}
-            style={[
-              styles.stat,
-              hardSm,
-              isDesktop && styles.statDesktop,
-              passkey && { backgroundColor: C.lavender },
-            ]}
+            style={[styles.stat, isDesktop && styles.statDesktop]}
             haptic={null}
             scaleTo={0.99}
           >
-            <Ionicons
-              name={passkey ? "shield-checkmark" : "shield-outline"}
-              size={26}
-              color={passkey ? C.onLavender : C.warning}
-              style={{ marginBottom: 2 }}
-            />
-            <Text style={[styles.statLabel, passkey && { color: C.onLavender }]}>
-              VAJRA{"\n"}TOUCH {passkey ? "ON" : "OFF"}
-            </Text>
+            <View style={[styles.statChip, { backgroundColor: C.goldBg }]}>
+              <Ionicons
+                name={passkey ? "shield-checkmark" : "shield-half"}
+                size={17}
+                color={C.gold}
+              />
+            </View>
+            <View style={styles.statBottom}>
+              <Text
+                style={[
+                  styles.statValue,
+                  isDesktop && styles.statValueDesktop,
+                  { color: passkey ? C.ink : C.gold },
+                ]}
+              >
+                {passkey ? "ON" : "OFF"}
+              </Text>
+              <Text style={styles.statLabel}>VAJRA{"\n"}TOUCH</Text>
+            </View>
           </PressableScale>
         </View>
 
@@ -368,9 +406,15 @@ export default function Home() {
                   isDesktop && styles.stepDesktop,
                 ]}
               >
-                <Text style={[styles.stepNum, isDesktop && styles.stepNumDesktop]}>
-                  {s.n}
-                </Text>
+                <View
+                  style={[styles.stepNumWrap, isDesktop && styles.stepNumWrapDesktop]}
+                >
+                  <Text
+                    style={[styles.stepNum, isDesktop && styles.stepNumDesktop]}
+                  >
+                    {s.n}
+                  </Text>
+                </View>
                 <View style={styles.stepText}>
                   <Text style={styles.stepTitle}>{s.title}</Text>
                   <Text style={styles.stepBody}>{s.body}</Text>
@@ -410,7 +454,7 @@ export default function Home() {
               onAction={() => router.push("/create")}
             />
           ) : (
-            <View style={isTablet ? styles.ledgerCard : undefined}>
+            <View style={styles.ledgerCard}>
               {recent.map((r, i) => (
                 <RequestRow
                   key={r.id}
@@ -447,6 +491,7 @@ export default function Home() {
           <View style={styles.footerRow}>
             <Button
               label="Create a request"
+              icon="add"
               onPress={() => router.push("/create")}
               style={styles.footerPrimary}
               testID="home-create-request-button"
@@ -523,7 +568,8 @@ const styles = StyleSheet.create({
     borderColor: C.ink,
     paddingHorizontal: S.lg,
     paddingTop: S.xl,
-    paddingBottom: S.xxl + S.sm,
+    paddingBottom: S.xxl + S.md,
+    overflow: "hidden",
   },
   heroInner: { width: "100%" },
   heroInnerDesktop: {
@@ -542,57 +588,58 @@ const styles = StyleSheet.create({
   heroRight: { flex: 1, maxWidth: 470 },
   heroKicker: {
     fontFamily: F.bold,
-    fontSize: 10.5,
-    letterSpacing: 2.2,
+    fontSize: 11,
+    letterSpacing: 2.6,
     color: C.brand,
-    marginBottom: S.md,
+    marginBottom: S.lg,
   },
   heroTitle: {
     fontFamily: F.display,
-    fontSize: 42,
-    lineHeight: 47,
-    letterSpacing: -1,
+    fontSize: 44,
+    lineHeight: 50,
+    letterSpacing: -1.2,
     color: C.ink,
   },
-  heroTitleDesktop: { fontSize: 62, lineHeight: 67, letterSpacing: -1.5 },
+  heroTitleDesktop: { fontSize: 66, lineHeight: 71, letterSpacing: -2 },
   heroStrike: {
     fontFamily: F.serif,
-    fontSize: 41,
+    fontSize: 43,
     color: C.brand,
     textDecorationLine: "line-through",
     textDecorationColor: C.pink,
   },
-  heroStrikeDesktop: { fontSize: 60 },
+  heroStrikeDesktop: { fontSize: 64 },
   heroBody: {
     fontFamily: F.med,
-    fontSize: 14.5,
-    lineHeight: 22,
+    fontSize: 15.5,
+    lineHeight: 24,
     color: C.inkSoft,
     marginTop: S.lg,
-    maxWidth: 400,
+    maxWidth: 420,
   },
-  heroCtaRow: { flexDirection: "row", gap: S.md, marginTop: S.xl },
+  heroCtaRow: { flexDirection: "row", gap: S.lg, marginTop: S.xxl },
   heroCta: { minWidth: 190 },
-  objectStage: { marginTop: S.xxl, height: 190, justifyContent: "center" },
-  objectStageDesktop: { marginTop: 0, height: 220 },
+  objectStage: { marginTop: S.xxl, height: 200, justifyContent: "center" },
+  objectStageDesktop: { marginTop: 0, height: 232 },
   objectBack: {
     position: "absolute",
     left: S.xl,
     right: S.xl,
-    height: 168,
-    borderRadius: R.lg,
+    height: 172,
+    borderRadius: 18,
     backgroundColor: C.lavender,
     borderWidth: 1.5,
     borderColor: C.ink,
   },
   requestCard: {
     backgroundColor: C.white,
-    borderRadius: R.lg,
+    borderRadius: 18,
     borderWidth: 1.5,
     borderColor: C.ink,
-    padding: S.lg,
+    padding: S.xl,
     marginHorizontal: S.xs,
-    boxShadow: "0px 5px 0px #0E091C",
+    boxShadow:
+      "0px 6px 0px #0E091C, 0px 26px 52px rgba(42,28,107,0.18), inset 0px 1.5px 0px rgba(255,255,255,0.85)",
   },
   cardTopRow: {
     flexDirection: "row",
@@ -605,22 +652,29 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     color: C.inkFaint,
   },
+  cardSealRing: {
+    width: 32,
+    height: 32,
+    borderRadius: R.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    boxShadow: "0px 3px 10px rgba(110,84,255,0.45)",
+  },
   cardSeal: {
-    width: 26,
-    height: 26,
+    width: 25,
+    height: 25,
     borderRadius: R.pill,
     backgroundColor: C.brand,
-    borderWidth: 1.25,
-    borderColor: C.ink,
     alignItems: "center",
     justifyContent: "center",
   },
   cardAmount: {
     fontFamily: F.display,
-    fontSize: 40,
+    fontSize: 42,
     letterSpacing: -0.5,
     color: C.ink,
-    marginTop: S.sm,
+    marginTop: S.md,
   },
   cardUnit: { fontSize: 18, letterSpacing: 0, color: C.inkFaint },
   cardToRow: {
@@ -649,20 +703,20 @@ const styles = StyleSheet.create({
     color: C.brand,
   },
   cardCode: { fontFamily: MONO, fontSize: 11, color: C.ink },
-  pad: { paddingHorizontal: S.lg, marginTop: S.xl + S.sm },
+  pad: { paddingHorizontal: S.lg, marginTop: S.xl + S.md },
   padDesktop: {
     maxWidth: MAXW,
     width: "100%",
     alignSelf: "center",
     paddingHorizontal: S.xl,
-    marginTop: S.xxl + S.sm,
+    marginTop: S.xxxl + S.sm,
   },
   padNarrowDesktop: {
     maxWidth: 800,
     width: "100%",
     alignSelf: "center",
     paddingHorizontal: S.xl,
-    marginTop: S.xxl + S.sm,
+    marginTop: S.xxxl + S.sm,
   },
   nudge: {
     flexDirection: "row",
@@ -692,24 +746,35 @@ const styles = StyleSheet.create({
   stat: {
     flex: 1,
     backgroundColor: C.white,
-    borderRadius: R.lg - 4,
+    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: C.ink,
-    paddingVertical: S.lg,
-    paddingHorizontal: S.md,
-    minHeight: 96,
-    justifyContent: "flex-end",
+    padding: S.lg,
+    minHeight: 132,
+    justifyContent: "space-between",
+    boxShadow:
+      "0px 3px 0px #0E091C, 0px 12px 24px rgba(42,28,107,0.09), inset 0px 1px 0px rgba(255,255,255,0.75)",
   },
-  statDesktop: { minHeight: 128, paddingHorizontal: S.xl },
-  statValue: { fontFamily: F.display, fontSize: 27, color: C.ink },
-  statValueDesktop: { fontSize: 36 },
+  statDesktop: { minHeight: 160, padding: S.xl },
+  statChip: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    borderWidth: 1.25,
+    borderColor: C.ink,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statBottom: { marginTop: S.md },
+  statValue: { fontFamily: F.display, fontSize: 30, color: C.ink },
+  statValueDesktop: { fontSize: 40 },
   statLabel: {
     fontFamily: F.bold,
-    fontSize: 9,
-    letterSpacing: 1.2,
-    lineHeight: 13,
-    color: C.inkFaint,
-    marginTop: 5,
+    fontSize: 10.5,
+    letterSpacing: 1.3,
+    lineHeight: 15,
+    color: C.inkSoft,
+    marginTop: 6,
   },
   sectionHead: {
     flexDirection: "row",
@@ -739,30 +804,37 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     paddingBottom: S.lg,
   },
-  stepNum: {
-    fontFamily: F.display,
-    fontSize: 36,
-    lineHeight: 40,
-    color: C.lavender,
-    width: 52,
+  stepNumWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: R.pill,
+    backgroundColor: C.white,
+    borderWidth: 1.5,
+    borderColor: C.ink,
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0px 2.5px 0px #0E091C",
   },
-  stepNumDesktop: { fontSize: 48, lineHeight: 52, width: undefined },
-  stepText: { flex: 1, paddingTop: 3 },
-  stepTitle: { fontFamily: F.semi, fontSize: 15.5, color: C.ink },
+  stepNumWrapDesktop: { width: 54, height: 54 },
+  stepNum: { fontFamily: F.display, fontSize: 17, color: C.brand },
+  stepNumDesktop: { fontSize: 19 },
+  stepText: { flex: 1, paddingTop: 2 },
+  stepTitle: { fontFamily: F.semi, fontSize: 16, color: C.ink },
   stepBody: {
     fontFamily: F.med,
-    fontSize: 12.5,
-    lineHeight: 19,
+    fontSize: 13,
+    lineHeight: 20,
     color: C.inkSoft,
-    marginTop: 4,
+    marginTop: 5,
   },
   ledgerCard: {
     backgroundColor: C.white,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1.5,
     borderColor: C.ink,
     paddingHorizontal: S.lg,
-    boxShadow: "0px 4px 0px #0E091C",
+    boxShadow:
+      "0px 4px 0px #0E091C, 0px 14px 30px rgba(42,28,107,0.10), inset 0px 1px 0px rgba(255,255,255,0.7)",
   },
   protoFoot: {
     fontFamily: F.bold,

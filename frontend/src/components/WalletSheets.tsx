@@ -6,63 +6,43 @@ import Animated, { ZoomIn } from "react-native-reanimated";
 import Button from "./Button";
 import PressableScale, { triggerHaptic } from "./PressableScale";
 import Sheet from "./Sheet";
+import { fmtMon, shortAddr } from "@/src/lib/format";
+import { DEMO_WALLET, delay } from "@/src/lib/mock";
 import type { Wallet } from "@/src/lib/types";
-import { MONAD_MAINNET_CHAIN_ID } from "@/src/lib/web3/chain";
-import { classifyError, userCopy, type ErrorCode } from "@/src/lib/web3/errors";
-import { getVajraWallet } from "@/src/lib/web3/wallet";
-import { useMotionPref, useVajra } from "@/src/state/vajra";
+import { useMotionPref } from "@/src/state/vajra";
 import { C, F, MONO, R, S } from "@/src/theme";
 
-// ——— Connect wallet (real EIP-1193 injected wallet) ———
+// ——— Connect wallet (simulated — no real wallet is contacted) ———
 
 export function ConnectWalletSheet({
   visible,
   onClose,
   onConnected,
+  forceNetwork,
 }: {
   visible: boolean;
   onClose: () => void;
   onConnected: (w: Wallet) => void;
+  forceNetwork?: Wallet["network"];
 }) {
-  const { connectWallet } = useVajra();
   const [phase, setPhase] = useState<"choose" | "connecting">("choose");
-  const [error, setError] = useState<{ title: string; body: string } | null>(null);
   const alive = useRef(true);
-
-  const available = getVajraWallet().isAvailable();
 
   useEffect(() => {
     alive.current = true;
-    if (visible) {
-      setPhase("choose");
-      setError(null);
-    }
+    if (visible) setPhase("choose");
     return () => {
       alive.current = false;
     };
   }, [visible]);
 
   const connect = async () => {
-    setError(null);
     setPhase("connecting");
-    try {
-      const wallet = await connectWallet();
-      if (!alive.current) return;
-      triggerHaptic("success");
-      onConnected(wallet);
-      onClose();
-    } catch (err) {
-      if (!alive.current) return;
-      const classified = classifyError(err);
-      const copy = userCopy(classified.code);
-      if (classified.code === "WALLET_REJECTED") {
-        // Declined in the wallet — back to the chooser, no error framing.
-        setPhase("choose");
-        return;
-      }
-      setError({ title: copy.title, body: copy.whatHappened });
-      setPhase("choose");
-    }
+    await delay(1200);
+    if (!alive.current) return;
+    triggerHaptic("success");
+    onConnected({ ...DEMO_WALLET, network: forceNetwork || "Monad Mainnet" });
+    onClose();
   };
 
   return (
@@ -76,50 +56,35 @@ export function ConnectWalletSheet({
       {phase === "choose" ? (
         <View>
           <Text style={styles.caption}>
-            Vajra connects to the wallet in your browser and asks it to switch
-            to Monad Mainnet (chain ID {MONAD_MAINNET_CHAIN_ID}).
+            Prototype build. No real wallet is contacted. The demo wallet
+            signs in instantly.
           </Text>
-          {error ? (
-            <View style={styles.errorBox} testID="connect-wallet-error">
-              <Ionicons name="alert-circle" size={16} color={C.error} />
-              <Text style={styles.errorText}>
-                {error.title}. {error.body}
-              </Text>
+          <PressableScale
+            testID="wallet-option-demo"
+            accessibilityLabel="Connect Vajra Demo Wallet"
+            onPress={connect}
+            style={styles.walletRow}
+          >
+            <View style={[styles.walletIcon, { backgroundColor: C.lavenderSoft }]}>
+              <Ionicons name="wallet" size={22} color={C.brand} />
             </View>
-          ) : null}
-          {available ? (
-            <PressableScale
-              testID="wallet-option-injected"
-              accessibilityLabel="Connect browser wallet"
-              onPress={connect}
-              style={styles.walletRow}
-            >
-              <View style={[styles.walletIcon, { backgroundColor: C.lavenderSoft }]}>
-                <Ionicons name="wallet" size={22} color={C.brand} />
-              </View>
-              <View style={styles.walletText}>
-                <Text style={styles.walletName}>Browser wallet</Text>
-                <Text style={styles.walletAddr}>
-                  MetaMask, Rabby or any injected wallet
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={C.inkFaint} />
-            </PressableScale>
-          ) : (
-            <View style={[styles.walletRow, styles.walletRowOff]} testID="wallet-none-available">
+            <View style={styles.walletText}>
+              <Text style={styles.walletName}>Vajra Demo Wallet</Text>
+              <Text style={styles.walletAddr}>{shortAddr(DEMO_WALLET.address)}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={C.inkFaint} />
+          </PressableScale>
+          {["MetaMask", "WalletConnect"].map((name) => (
+            <View key={name} style={[styles.walletRow, styles.walletRowOff]}>
               <View style={[styles.walletIcon, { backgroundColor: C.surface2 }]}>
                 <Ionicons name="cube-outline" size={22} color={C.inkFaint} />
               </View>
               <View style={styles.walletText}>
-                <Text style={[styles.walletName, { color: C.inkFaint }]}>
-                  No browser wallet found
-                </Text>
-                <Text style={styles.walletAddr}>
-                  Install a wallet that supports Monad Mainnet to continue
-                </Text>
+                <Text style={[styles.walletName, { color: C.inkFaint }]}>{name}</Text>
+                <Text style={styles.walletAddr}>Available after real integration</Text>
               </View>
             </View>
-          )}
+          ))}
           <Button
             label="Cancel"
             onPress={onClose}
@@ -133,16 +98,14 @@ export function ConnectWalletSheet({
         <View style={styles.center}>
           <ActivityIndicator size="large" color={C.brand} />
           <Text style={styles.phaseTitle}>Connecting…</Text>
-          <Text style={styles.caption}>
-            Approve the connection in your wallet.
-          </Text>
+          <Text style={styles.caption}>Waiting for the wallet to approve the session.</Text>
         </View>
       )}
     </Sheet>
   );
 }
 
-// ——— Vajra Touch ceremony (real wallet signature / passkey prompt) ———
+// ——— Vajra Touch ceremony (simulated passkey — UI only, no cryptography) ———
 
 export function VajraTouchSheet({
   visible,
@@ -150,63 +113,34 @@ export function VajraTouchSheet({
   title,
   caption,
   details,
-  onAuthenticate,
-  actionLabel = "Authenticate with Vajra Touch",
-  note,
 }: {
   visible: boolean;
   onDone: (result: "approved" | "cancelled") => void;
   title: string;
   caption: string;
   details?: { label: string; value: string }[];
-  /**
-   * Real authentication work (EIP-712 signature or WebAuthn ceremony).
-   * Resolve on success; throw a VajraError (or anything classifiable) on
-   * failure. WALLET_REJECTED is reported as "cancelled".
-   */
-  onAuthenticate?: () => Promise<void>;
-  actionLabel?: string;
-  /** Small print under the ceremony. Honest status only. */
-  note?: string;
 }) {
   const [phase, setPhase] = useState<"prompt" | "authorizing" | "success">("prompt");
-  const [error, setError] = useState<{ title: string; body: string } | null>(null);
   const alive = useRef(true);
   const reduceMotion = useMotionPref();
 
   useEffect(() => {
     alive.current = true;
-    if (visible) {
-      setPhase("prompt");
-      setError(null);
-    }
+    if (visible) setPhase("prompt");
     return () => {
       alive.current = false;
     };
   }, [visible]);
 
   const authenticate = async () => {
-    setError(null);
     setPhase("authorizing");
-    try {
-      if (onAuthenticate) await onAuthenticate();
-      if (!alive.current) return;
-      triggerHaptic("success");
-      setPhase("success");
-      setTimeout(() => {
-        if (alive.current) onDone("approved");
-      }, 700);
-    } catch (err) {
-      if (!alive.current) return;
-      const classified = classifyError(err);
-      if (classified.code === ("WALLET_REJECTED" as ErrorCode)) {
-        onDone("cancelled");
-        return;
-      }
-      const copy = userCopy(classified.code);
-      setError({ title: copy.title, body: copy.whatHappened });
-      setPhase("prompt");
-    }
+    await delay(1400);
+    if (!alive.current) return;
+    triggerHaptic("success");
+    setPhase("success");
+    await delay(700);
+    if (!alive.current) return;
+    onDone("approved");
   };
 
   return (
@@ -231,22 +165,13 @@ export function VajraTouchSheet({
         </Text>
         <Text style={styles.caption}>
           {phase === "authorizing"
-            ? "Waiting for your wallet…"
+            ? "Waiting for Vajra Touch…"
             : phase === "success"
-              ? "Your wallet signed these exact terms."
+              ? "Your device approved these exact terms."
               : caption}
         </Text>
-        {note ? <Text style={styles.protoNote}>{note}</Text> : null}
+        <Text style={styles.protoNote}>Simulated passkey ceremony · prototype build</Text>
       </View>
-
-      {error && phase === "prompt" ? (
-        <View style={styles.errorBox} testID="vajra-touch-error">
-          <Ionicons name="alert-circle" size={16} color={C.error} />
-          <Text style={styles.errorText}>
-            {error.title}. {error.body}
-          </Text>
-        </View>
-      ) : null}
 
       {details && phase === "prompt" ? (
         <View style={styles.detailBox}>
@@ -264,7 +189,7 @@ export function VajraTouchSheet({
       {phase === "prompt" ? (
         <View style={{ marginTop: S.lg }}>
           <Button
-            label={actionLabel}
+            label="Authenticate with Vajra Touch"
             icon="finger-print"
             onPress={authenticate}
             testID="vajra-touch-authenticate"
@@ -287,6 +212,63 @@ export function VajraTouchSheet({
   );
 }
 
+// ——— Simulated wallet payment confirmation ———
+
+export function WalletConfirmSheet({
+  visible,
+  amountMon,
+  to,
+  onApprove,
+  onReject,
+}: {
+  visible: boolean;
+  amountMon: string;
+  to: string;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onReject}
+      title="Confirm in wallet"
+      testID="wallet-confirm-sheet"
+    >
+      <Text style={styles.caption}>
+        Simulated wallet · prototype build. Nothing leaves your device.
+      </Text>
+      <View style={styles.detailBox}>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Send</Text>
+          <Text style={styles.detailValueStrong}>{fmtMon(amountMon)} MON</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>To</Text>
+          <Text style={[styles.detailValue, { fontFamily: MONO }]}>{shortAddr(to)}</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Network</Text>
+          <Text style={styles.detailValue}>Monad Mainnet</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Est. fee</Text>
+          <Text style={styles.detailValue}>0.0021 MON</Text>
+        </View>
+      </View>
+      <View style={{ marginTop: S.lg }}>
+        <Button label="Approve in wallet" onPress={onApprove} testID="wallet-approve-button" />
+        <Button
+          label="Reject"
+          onPress={onReject}
+          variant="danger"
+          style={{ marginTop: S.sm }}
+          testID="wallet-reject-button"
+        />
+      </View>
+    </Sheet>
+  );
+}
+
 const styles = StyleSheet.create({
   caption: {
     fontFamily: F.med,
@@ -301,23 +283,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: C.inkFaint,
     marginTop: S.sm,
-    textAlign: "center",
-  },
-  errorBox: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: S.sm,
-    backgroundColor: C.errorBg,
-    borderRadius: R.md,
-    padding: S.md,
-    marginBottom: S.md,
-  },
-  errorText: {
-    flex: 1,
-    fontFamily: F.med,
-    fontSize: 12.5,
-    lineHeight: 18,
-    color: C.error,
   },
   walletRow: {
     flexDirection: "row",
@@ -383,4 +348,5 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textAlign: "right",
   },
+  detailValueStrong: { fontFamily: F.display, fontSize: 17, color: C.ink },
 });
