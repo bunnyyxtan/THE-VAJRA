@@ -8,3 +8,4 @@ broadcast/
 !.env.example
 wallet_tmp.json
 *.tsbuildinfo
+broadcast/
