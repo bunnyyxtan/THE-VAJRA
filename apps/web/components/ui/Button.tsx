@@ -84,7 +84,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           {children}
         </span>
         {(loading || success) && (
-          <span className="btn__overlay" aria-hidden={success || undefined}>
+          <span className="btn__overlay">
             {success ? (
               <CheckIcon />
             ) : (
@@ -93,7 +93,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             <span>{overlayText}</span>
           </span>
         )}
-        {loading && <span className="visually-hidden">{overlayText}</span>}
       </button>
     );
   }
