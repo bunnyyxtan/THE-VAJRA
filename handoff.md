@@ -27,6 +27,21 @@ No Design.md or styling. No fake success. No committed secrets. No testnet fallb
 
 ## Mainnet facts
 Contract: 0x7d17f2765bb58ceb27b9e1e52b068c72ccb8299f · chain 143 · verified on Sourcify/Monadscan.
+
+## Design system installed (2026-07-19, Wave 1)
+- DESIGN.md at repo root: formal design system derived from owner-approved
+  docs/design-direction-v1.md (tokens, type, motion, grammars, proof chain, a11y). Binding for
+  all frontend work; tokens change only with a log.md entry.
+- docs/inspiration-synthesis.md: craft observations from design galleries (lapa.ninja was
+  unreachable; refero.design is JS-rendered — both noted).
+- Agent skills installed in .agents/skills/ (cloned shallow, .git removed — same pattern as
+  monskill): canvas-design, frontend-design (anthropics/skills); impeccable (pbakaus — single
+  skill; critique/distill/quieter are reference docs inside it, not separate skills);
+  extract-design-system; oklch-skill; userinterface-wiki; make-interfaces-feel-better;
+  emilkowalski set (animation-vocabulary, apple-design, emil-design-eng,
+  find-animation-opportunities, improve-animations, review-animations); grill-me (mattpocock);
+  vercel-react-best-practices + vercel-composition-patterns (vercel-labs/agent-skills).
+  wshobson/agents skipped: huge multi-harness plugin marketplace, not design-relevant.
 ## Next 3 actions (updated)
 1. Phase 2: functional Next.js skeleton (semantic, unstyled) wired to the mainnet contract.
 2. E2E demo script: the 90-second judge flow as an executable test (test gate = demo gate).
