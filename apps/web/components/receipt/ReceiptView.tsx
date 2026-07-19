@@ -61,6 +61,19 @@ const paymentFulfilledEvent = VAJRA_ABI.find(
     entry.type === "event" && "name" in entry && entry.name === "PaymentFulfilled",
 );
 
+/**
+ * The public Monad RPC limits eth_getLogs to a 100-block range, and the chain
+ * is tens of millions of blocks deep — a full-history scan is not possible.
+ * The contract writes settlement.paidAt = block.timestamp, so the event check
+ * locates the settlement block by binary-searching block timestamps for
+ * paidAt, then scans forward in ≤100-block chunks. Deterministic, works on
+ * any RPC regardless of log-range limits.
+ */
+const LOG_CHUNK = 100n;
+const MAX_LOG_CHUNKS = 6;
+/** Stop scanning once we are this many seconds past the settlement second. */
+const TIMESTAMP_EXIT_MARGIN = 64n;
+
 const timeFmt = new Intl.DateTimeFormat("en-US", {
   hour: "2-digit",
   minute: "2-digit",
@@ -140,9 +153,10 @@ export function ReceiptView({ requestId }: { requestId: string }) {
     [config],
   );
 
-  /* Two INDEPENDENT verification channels, each with its own pending state:
-     A) contract state (statusOf + settlementOf)
-     B) the PaymentFulfilled event log (canonical contract, indexed requestId) */
+  /* Two verification channels, each with its own pending state:
+     A) contract state (statusOf + settlementOf) — the settlement record.
+     B) the PaymentFulfilled event log — independently located from the
+        settlement timestamp, then cross-checked against A. */
   const [stateCheck, setStateCheck] = useState<Check<StateResult>>({ phase: "loading" });
   const [eventCheck, setEventCheck] = useState<Check<EventResult>>({ phase: "loading" });
   const [refreshing, setRefreshing] = useState(false);
@@ -152,16 +166,18 @@ export function ReceiptView({ requestId }: { requestId: string }) {
   const [eventSoftError, setEventSoftError] = useState<string | null>(null);
 
   const runStateCheck = useCallback(
-    async (soft = false) => {
-      if (!valid) return;
+    async (soft = false): Promise<StateResult | null> => {
+      if (!valid) return null;
       if (!soft) setStateCheck({ phase: "loading" });
       try {
         const [status, settlement] = await Promise.all([
           readStatusOf(client, id, config),
           readSettlementOf(client, id, config),
         ]);
-        setStateCheck({ phase: "done", value: { status, settlement, at: Date.now() } });
+        const result = { status, settlement, at: Date.now() };
+        setStateCheck({ phase: "done", value: result });
         setStateSoftError(null);
+        return result;
       } catch (err) {
         const message = describeError(err);
         setStateCheck((prev) => {
@@ -172,50 +188,81 @@ export function ReceiptView({ requestId }: { requestId: string }) {
           }
           return { phase: "error", message };
         });
+        return null;
       }
     },
     [client, id, config, valid],
   );
 
   const runEventCheck = useCallback(
-    async (soft = false) => {
+    async (paidAt: bigint, soft = false): Promise<void> => {
       if (!valid || !paymentFulfilledEvent) return;
       if (!soft) setEventCheck({ phase: "loading" });
       try {
-        const logs = await client.getLogs({
-          address: config.contractAddress,
-          event: paymentFulfilledEvent,
-          args: { requestId: id },
-          fromBlock: 0n,
-        });
-        const log = [...logs]
-          .reverse()
-          .find((l) => l.args.requestId?.toLowerCase() === id.toLowerCase());
-        const a = log?.args;
-        let found: FulfilledLog | null = null;
-        if (
-          log &&
-          a &&
-          a.payer !== undefined &&
-          a.recipient !== undefined &&
-          a.amount !== undefined &&
-          a.paidAt !== undefined &&
-          a.memoHash !== undefined &&
-          a.authMode !== undefined &&
-          a.authVersion !== undefined
-        ) {
-          found = {
-            txHash: log.transactionHash,
-            blockNumber: log.blockNumber,
-            payer: a.payer,
-            recipient: a.recipient,
-            amount: a.amount,
-            paidAt: a.paidAt,
-            memoHash: a.memoHash,
-            authMode: a.authMode,
-            authVersion: a.authVersion,
-          };
+        // 1. Binary-search block timestamps for the settlement second.
+        const latest = await client.getBlockNumber();
+        let lo = 0n;
+        let hi = latest;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1n;
+          const block = await client.getBlock({
+            blockNumber: mid,
+            includeTransactions: false,
+          });
+          if (block.timestamp >= paidAt) hi = mid;
+          else lo = mid + 1n;
         }
+
+        // 2. Scan forward from the first block of the settlement second in
+        //    ≤100-block chunks until the matching event appears.
+        let found: FulfilledLog | null = null;
+        for (let chunk = 0; chunk < MAX_LOG_CHUNKS && lo <= latest; chunk++) {
+          const fromBlock = lo + BigInt(chunk) * LOG_CHUNK;
+          const toBlock =
+            fromBlock + (LOG_CHUNK - 1n) > latest ? latest : fromBlock + (LOG_CHUNK - 1n);
+          const logs = await client.getLogs({
+            address: config.contractAddress,
+            event: paymentFulfilledEvent,
+            args: { requestId: id },
+            fromBlock,
+            toBlock,
+          });
+          const match = logs.find(
+            (l) => l.args.requestId?.toLowerCase() === id.toLowerCase(),
+          );
+          if (match) {
+            const a = match.args;
+            if (
+              a.payer !== undefined &&
+              a.recipient !== undefined &&
+              a.amount !== undefined &&
+              a.paidAt !== undefined &&
+              a.memoHash !== undefined &&
+              a.authMode !== undefined &&
+              a.authVersion !== undefined
+            ) {
+              found = {
+                txHash: match.transactionHash,
+                blockNumber: match.blockNumber,
+                payer: a.payer,
+                recipient: a.recipient,
+                amount: a.amount,
+                paidAt: a.paidAt,
+                memoHash: a.memoHash,
+                authMode: a.authMode,
+                authVersion: a.authVersion,
+              };
+            }
+            break;
+          }
+          // Early exit once we are well past the settlement second.
+          const probe = await client.getBlock({
+            blockNumber: toBlock,
+            includeTransactions: false,
+          });
+          if (probe.timestamp > paidAt + TIMESTAMP_EXIT_MARGIN) break;
+        }
+
         setEventCheck({ phase: "done", value: { found, at: Date.now() } });
         setEventSoftError(null);
       } catch (err) {
@@ -232,16 +279,35 @@ export function ReceiptView({ requestId }: { requestId: string }) {
     [client, id, config, valid],
   );
 
+  /* Channel A runs immediately; channel B follows once the settlement
+     timestamp is known (it is what makes the event locatable at all).
+     Auto-runs once per settlement — soft re-verify keeps stale rows. */
   useEffect(() => {
     void runStateCheck();
-    void runEventCheck();
-  }, [runStateCheck, runEventCheck]);
+  }, [runStateCheck]);
+
+  const autoEventKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (stateCheck.phase !== "done") return;
+    if (stateCheck.value.status !== REQUEST_STATUS.Paid) {
+      // Unused / revoked: there is no settlement event to locate.
+      setEventCheck({ phase: "done", value: { found: null, at: Date.now() } });
+      return;
+    }
+    const key = stateCheck.value.settlement.paidAt.toString();
+    if (autoEventKey.current === key) return;
+    autoEventKey.current = key;
+    void runEventCheck(stateCheck.value.settlement.paidAt);
+  }, [stateCheck, runEventCheck]);
 
   const reverify = useCallback(async () => {
     setRefreshing(true);
     setStateSoftError(null);
     setEventSoftError(null);
-    await Promise.allSettled([runStateCheck(true), runEventCheck(true)]);
+    const state = await runStateCheck(true);
+    if (state && state.status === REQUEST_STATUS.Paid) {
+      await runEventCheck(state.settlement.paidAt, true);
+    }
     setRefreshing(false);
   }, [runStateCheck, runEventCheck]);
 
@@ -255,21 +321,6 @@ export function ReceiptView({ requestId }: { requestId: string }) {
       : null;
   const eventLog = eventCheck.phase === "done" ? eventCheck.value.found : null;
 
-  // The ledger renders from whichever authoritative source exists.
-  const source: Settlement | null =
-    settlement ??
-    (eventLog
-      ? {
-          payer: eventLog.payer,
-          recipient: eventLog.recipient,
-          amount: eventLog.amount,
-          paidAt: eventLog.paidAt,
-          memoHash: eventLog.memoHash,
-          authMode: eventLog.authMode as Settlement["authMode"],
-          authVersion: eventLog.authVersion,
-        }
-      : null);
-
   const mismatch =
     settlement !== null &&
     eventLog !== null &&
@@ -281,18 +332,10 @@ export function ReceiptView({ requestId }: { requestId: string }) {
       settlement.memoHash.toLowerCase() === eventLog.memoHash.toLowerCase()
     );
 
-  const confirmed = source !== null && !mismatch;
-  const bothFailed = stateCheck.phase === "error" && eventCheck.phase === "error";
-  const initialLoading =
-    !bothFailed &&
-    source === null &&
-    (stateCheck.phase === "loading" || eventCheck.phase === "loading") &&
-    !(stateCheck.phase === "done" && eventCheck.phase === "done");
-  const notFound =
-    stateCheck.phase === "done" &&
-    stateCheck.value.status !== REQUEST_STATUS.Paid &&
-    eventCheck.phase !== "loading" &&
-    eventLog === null;
+  const confirmed = settlement !== null && !mismatch;
+  const initialLoading = stateCheck.phase === "loading";
+  const stateFailed = stateCheck.phase === "error";
+  const notFound = stateCheck.phase === "done" && stateCheck.value.status !== REQUEST_STATUS.Paid;
   const revoked =
     stateCheck.phase === "done" && stateCheck.value.status === REQUEST_STATUS.Revoked;
 
@@ -372,13 +415,13 @@ export function ReceiptView({ requestId }: { requestId: string }) {
         <InvalidRequestId raw={requestId} contractExplorerUrl={contractExplorerUrl} />
       ) : initialLoading ? (
         <ReceiptSkeleton />
-      ) : bothFailed ? (
+      ) : stateFailed ? (
         <section className="receipt-empty" aria-busy={refreshing}>
           <h2 className="receipt-empty__title">Could not reach Monad Mainnet</h2>
           <p className="receipt-empty__body">
-            Neither the contract state nor the settlement event could be read right now, so
-            this receipt cannot be verified. No result is claimed either way — the request ID
-            is preserved below.
+            The contract state could not be read ({stateCheck.message}), so this receipt
+            cannot be verified. No result is claimed either way — the request ID is
+            preserved below.
           </p>
           <dl className="ledger">
             <LedgerRow label="Request ID" value={id} mono aside={<CopyButton text={id} />} />
@@ -415,18 +458,6 @@ export function ReceiptView({ requestId }: { requestId: string }) {
               link may come from a different deployment.
             </p>
           )}
-          {eventCheck.phase === "error" && (
-            <p className="receipt-note receipt-note--warning">
-              <WarningIcon />
-              <span>
-                The settlement event could not be read ({eventCheck.message}). The
-                contract-state answer above is authoritative; you can retry the event check.
-              </span>
-              <Button variant="ghost" onClick={() => void runEventCheck()}>
-                Retry
-              </Button>
-            </p>
-          )}
           <dl className="ledger">
             <LedgerRow label="Request ID" value={id} mono aside={<CopyButton text={id} />} />
           </dl>
@@ -452,15 +483,8 @@ export function ReceiptView({ requestId }: { requestId: string }) {
             </li>
           </ol>
         </section>
-      ) : confirmed && source ? (
+      ) : confirmed && settlement ? (
         <>
-          {stateCheck.phase === "error" && eventLog && (
-            <Banner tone="warning" title="Contract state re-read pending">
-              This receipt is verified from the PaymentFulfilled event of the canonical
-              contract. The contract state read failed ({stateCheck.message}) — the event is
-              authoritative chain data, but you can retry the state read.
-            </Banner>
-          )}
           {(stateSoftError || eventSoftError) && (
             <Banner tone="warning" title="Re-verification incomplete">
               {stateSoftError ?? eventSoftError} The evidence below is from the earlier
@@ -492,43 +516,43 @@ export function ReceiptView({ requestId }: { requestId: string }) {
             >
               <LedgerRow
                 label="Payer"
-                value={source.payer}
+                value={settlement.payer}
                 mono
-                aside={<CopyButton text={source.payer} />}
+                aside={<CopyButton text={settlement.payer} />}
               />
               <LedgerRow
                 label="Recipient"
-                value={source.recipient}
+                value={settlement.recipient}
                 mono
-                aside={<CopyButton text={source.recipient} />}
+                aside={<CopyButton text={settlement.recipient} />}
               />
               <LedgerRow
                 label="Amount"
                 value={
                   <span className="tnum" style={{ fontWeight: 700 }}>
-                    {formatUnits(source.amount, 18)} MON
+                    {formatUnits(settlement.amount, 18)} MON
                   </span>
                 }
               />
               <LedgerRow
                 label="Amount (wei)"
-                value={source.amount.toString()}
+                value={settlement.amount.toString()}
                 mono
-                aside={<CopyButton text={source.amount.toString()} />}
+                aside={<CopyButton text={settlement.amount.toString()} />}
               />
               <LedgerRow label="Request ID" value={id} mono aside={<CopyButton text={id} />} />
               <LedgerRow
                 label="Memo hash"
-                value={source.memoHash}
+                value={settlement.memoHash}
                 mono
-                aside={<CopyButton text={source.memoHash} />}
+                aside={<CopyButton text={settlement.memoHash} />}
               />
               <LedgerRow
                 label="Authorization"
                 value={
-                  source.authMode === 0
+                  settlement.authMode === 0
                     ? "Wallet signature (EIP-712)"
-                    : `Passkey (P-256, version ${source.authVersion})`
+                    : `Passkey (P-256, version ${settlement.authVersion})`
                 }
               />
               <LedgerRow
@@ -557,7 +581,10 @@ export function ReceiptView({ requestId }: { requestId: string }) {
                       </a>
                     </>
                   ) : eventCheck.phase === "error" ? (
-                    <Button variant="ghost" onClick={() => void runEventCheck()}>
+                    <Button
+                      variant="ghost"
+                      onClick={() => void runEventCheck(settlement.paidAt)}
+                    >
                       Retry
                     </Button>
                   ) : undefined
@@ -579,7 +606,7 @@ export function ReceiptView({ requestId }: { requestId: string }) {
                 label="Settled at"
                 value={
                   <span className="tnum">
-                    {dateTimeFmt.format(new Date(Number(source.paidAt) * 1000))}
+                    {dateTimeFmt.format(new Date(Number(settlement.paidAt) * 1000))}
                   </span>
                 }
               />
@@ -608,16 +635,32 @@ export function ReceiptView({ requestId }: { requestId: string }) {
             <p className="receipt-note receipt-note--warning">
               <WarningIcon />
               <span>
-                The PaymentFulfilled event could not be read ({eventCheck.message}), so the
+                The PaymentFulfilled event could not be located ({eventCheck.message}), so
+                the transaction hash and block number are pending. The settlement record
+                above comes from contract state and is authoritative.
+              </span>
+            </p>
+          )}
+          {eventCheck.phase === "done" && eventLog === null && (
+            <p className="receipt-note receipt-note--warning">
+              <WarningIcon />
+              <span>
+                No PaymentFulfilled event was found near the settlement block, so the
                 transaction hash and block number are pending. The settlement record above
                 comes from contract state and is authoritative.
               </span>
+              <Button variant="ghost" onClick={() => void runEventCheck(settlement.paidAt)}>
+                Retry
+              </Button>
             </p>
           )}
           {eventCheck.phase === "loading" && (
             <p className="receipt-note">
               <InfoIcon />
-              <span>Reading the PaymentFulfilled event from the canonical contract…</span>
+              <span>
+                Locating the settlement block on Monad and reading the PaymentFulfilled
+                event…
+              </span>
             </p>
           )}
 
@@ -670,36 +713,6 @@ export function ReceiptView({ requestId }: { requestId: string }) {
             </a>
             .
           </Banner>
-          <div className="receipt-actions">
-            <Button onClick={reverify} loading={refreshing} loadingText="Re-verifying on Monad">
-              Retry verification
-            </Button>
-          </div>
-        </section>
-      ) : stateCheck.phase === "error" ? (
-        /* Event channel answered (no PaymentFulfilled log) but the contract
-           state read failed — we cannot authoritatively say "no settlement". */
-        <section className="receipt-empty" aria-busy={refreshing}>
-          <h2 className="receipt-empty__title">Verification incomplete</h2>
-          <p className="receipt-empty__body">
-            No PaymentFulfilled event was found for this request ID, but the contract state
-            could not be read ({stateCheck.message}), so this cannot be confirmed as unpaid.
-            Nothing is claimed either way.
-          </p>
-          <dl className="ledger">
-            <LedgerRow label="Request ID" value={id} mono aside={<CopyButton text={id} />} />
-          </dl>
-          <p className="receipt-note">
-            <InfoIcon />
-            <span>
-              Verify independently: call <span className="mono">statusOf</span> with this
-              request ID on the{" "}
-              <a href={contractExplorerUrl} target="_blank" rel="noreferrer">
-                canonical VajraNativeV1 contract
-              </a>
-              .
-            </span>
-          </p>
           <div className="receipt-actions">
             <Button onClick={reverify} loading={refreshing} loadingText="Re-verifying on Monad">
               Retry verification
