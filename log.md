@@ -60,3 +60,18 @@ Never re-decide a logged decision without a new entry explaining why.
   duplicate fulfill reverted onchain with RequestAlreadyPaid() (0xc15afa82);
   revoke 0x102c84c02f9abb9fa1f6330452339c9cda168440e2d77a26a298cf9d26c8e614 (statusOf=Revoked).
 - Deployer holds remaining owner funds; smoke payer 0x3D87aFd58aF733332adEda985836375CC232eFe3 (key in .env).
+
+## 2026-07-19 — ADR: Vajra Code derivation + EIP-712 vector chain discovery
+- Context: Blueprint §17 requires a short human "Vajra Code" derived from requestId, shown
+  identically to recipient and payer. Also: TS parity tests against contracts/test/Vectors.t.sol
+  frozen digests initially failed at chainId 31337.
+- Decision (Vajra Code): first 4 bytes of the canonical requestId, rendered as 8 uppercase hex
+  chars grouped "XXXX-XXXX" (e.g. AD0A-4E98). Deterministic, case/separator-insensitive
+  comparison, hex-native to the evidence surfaces. Usability aid only, never authorization.
+- Decision (parity): the frozen vectors are chainId 143, NOT 31337 — Vectors.t.sol's header
+  comment is stale; foundry.toml sets chain_id = 143 for the test profile. Verified: all 8
+  vectors pass in TS at 143, AND TS requestId == live mainnet contract requestId() for a sample
+  request (onchain read via https://rpc.monad.xyz).
+- Rejected: base32/crockford alphabets (extra alphabet to audit; hex is already the product's
+  technical-identifier language); treating the vector mismatch as a viem bug (viem matched the
+  manual first-principles construction exactly).
