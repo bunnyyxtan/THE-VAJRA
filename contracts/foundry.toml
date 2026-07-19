@@ -1,0 +1,25 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc = "0.8.30"
+optimizer = true
+optimizer_runs = 1000
+via_ir = false
+metadata = true
+metadata_hash = "none"      # per Monad verify guide: https://docs.monad.xyz/guides/verify-smart-contract/foundry
+use_literal_content = true  # per Monad verify guide
+
+# Monad MAINNET configuration (verified 2026-07-19 against https://docs.monad.xyz/developer-essentials/network-information)
+eth-rpc-url = "https://rpc.monad.xyz"
+chain_id = 143
+
+[profile.default.fuzz]
+runs = 256
+
+[profile.default.invariant]
+runs = 32
+depth = 32
+fail_on_revert = false
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
