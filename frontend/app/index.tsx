@@ -3,7 +3,7 @@ import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React from "react";
-import { Platform, StyleSheet, Text, View } from "react-native";
+import { Image, Platform, StyleSheet, Text, View } from "react-native";
 import Animated, {
   interpolate,
   useAnimatedScrollHandler,
@@ -44,6 +44,8 @@ const STEPS = [
     body: "Every protected field is checked before money moves. Settlement leaves a permanent receipt on Monad.",
   },
 ];
+
+const LOGO_MARK = require("@/assets/images/vajra-logo.png");
 
 export default function Home() {
   const router = useRouter();
@@ -135,6 +137,11 @@ export default function Home() {
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <View style={[styles.headerRow, isDesktop && styles.headerRowDesktop]}>
           <View style={styles.brandRow}>
+            <Image
+              source={LOGO_MARK}
+              style={styles.logoMark}
+              accessibilityLabel="Vajra logo"
+            />
             <Text style={styles.wordmark}>VAJRA</Text>
             <View style={styles.netPill}>
               <View style={styles.netDot} />
@@ -531,6 +538,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: S.xl,
   },
   brandRow: { flexDirection: "row", alignItems: "center", gap: S.sm + 2 },
+  logoMark: { width: 32, height: 29, resizeMode: "contain" },
   wordmark: {
     fontFamily: F.display,
     fontSize: 19,
