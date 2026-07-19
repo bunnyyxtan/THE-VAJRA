@@ -199,24 +199,17 @@ export default function Security() {
       </View>
       </View>
 
-      {/* Prototype controls */}
+      {/* Network status */}
       <View style={isDesktop ? styles.cell : undefined}>
-      <Text style={styles.sectionTitle}>Prototype controls</Text>
+      <Text style={styles.sectionTitle}>Network</Text>
       <View style={[styles.card, softShadow, { paddingVertical: S.xs }]}>
         <ToggleRow
-          testID="security-toggle-outage"
-          icon="cloud-offline"
-          label="Simulate Monad outage"
-          sub="Shows how Vajra fails closed when verification is unavailable"
-          value={settings.outage}
-          onChange={(v) => {
-            setSetting("outage", v);
-            toast(
-              v
-                ? "Outage simulation on. Payments will fail closed."
-                : "Outage simulation off",
-            );
-          }}
+          testID="security-network-mainnet"
+          icon="flash"
+          label="Monad Mainnet"
+          sub="Chain ID 143 · real MON moves on every payment"
+          value={true}
+          onChange={() => {}}
         />
       </View>
       </View>

@@ -466,7 +466,7 @@ export default function Home() {
         </View>
 
         <Text style={styles.protoFoot}>
-          PROTOTYPE BUILD · SETTLEMENT ON MONAD IS SIMULATED
+          LIVE ON MONAD MAINNET · CONTRACT 0x7d17…8299f · VERIFIED
         </Text>
       </Animated.ScrollView>
 

@@ -235,7 +235,7 @@ export default function Receipt() {
       />
 
       <Text style={styles.protoNote}>
-        PROTOTYPE SETTLEMENT · NO REAL FUNDS MOVED ON MONAD
+        SEALED ON MONAD MAINNET · INDEPENDENTLY VERIFIABLE
       </Text>
 
       <Sheet
@@ -245,9 +245,9 @@ export default function Receipt() {
         testID="explorer-sheet"
       >
         <Text style={styles.sheetBody}>
-          This is a prototype receipt with a simulated transaction hash, so the
-          explorer won’t show it yet. In production this opens
-          monadexplorer.com so you can independently verify the settlement.
+          This receipt is backed by a real transaction on Monad Mainnet. Open
+          it on Monadscan to independently verify the settlement, the event,
+          and the final state.
         </Text>
         <Button
           label="Copy explorer link"
