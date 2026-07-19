@@ -1,0 +1,367 @@
+.page {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(1100px 500px at 50% -8%, rgba(131, 110, 249, 0.07), transparent 62%),
+    var(--v-bg);
+  position: relative;
+}
+
+/* porcelain dot field */
+.page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(23, 19, 27, 0.055) 1px, transparent 1.4px);
+  background-size: 26px 26px;
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 42%, black 30%, transparent 78%);
+  pointer-events: none;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 32px;
+  position: relative;
+  z-index: 10;
+}
+
+.wordmark {
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: 0.14em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wordmarkDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--v-action);
+  display: inline-block;
+}
+
+.networkPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--v-text-2);
+  background: var(--v-glass);
+  border: 1px solid var(--v-glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 7px 14px;
+  border-radius: 999px;
+}
+
+.networkDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--v-action);
+  box-shadow: 0 0 0 3px var(--v-action-soft);
+}
+
+.stage {
+  flex: 1;
+  position: relative;
+  display: grid;
+  place-items: center;
+  perspective: 1400px;
+  perspective-origin: 50% 42%;
+  padding: 32px;
+  z-index: 5;
+}
+
+/* ---------- floating cards ---------- */
+
+.card {
+  position: absolute;
+  background: var(--v-glass);
+  border: 1px solid var(--v-glass-border);
+  backdrop-filter: blur(22px) saturate(1.15);
+  -webkit-backdrop-filter: blur(22px) saturate(1.15);
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 30px 60px -24px rgba(23, 19, 27, 0.22);
+  will-change: transform;
+  transform-style: preserve-3d;
+  z-index: 2;
+}
+
+.cardA {
+  width: 264px;
+  padding: 20px;
+  left: max(4vw, 24px);
+  top: 50%;
+  margin-top: -190px;
+  animation: floatA 7s var(--ease-standard) infinite;
+}
+
+.cardB {
+  width: 208px;
+  padding: 24px 20px;
+  text-align: center;
+  color: var(--v-signature);
+  right: max(5vw, 28px);
+  top: 50%;
+  margin-top: -110px;
+  animation: floatB 8.5s var(--ease-standard) infinite;
+}
+
+@keyframes floatA {
+  0%, 100% { margin-top: -190px; }
+  50% { margin-top: -198px; }
+}
+@keyframes floatB {
+  0%, 100% { margin-top: -110px; }
+  50% { margin-top: -102px; }
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.cardLabel {
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  color: var(--v-muted);
+}
+
+.cardDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--v-action);
+}
+
+.amount {
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--v-text);
+  line-height: 1;
+  margin-bottom: 16px;
+}
+
+.amountUnit {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--v-muted);
+  letter-spacing: 0.02em;
+}
+
+.rule {
+  height: 1px;
+  background: var(--v-border);
+  margin: 12px 0;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--v-text-2);
+  padding: 3px 0;
+}
+
+.row .mono {
+  color: var(--v-text);
+  font-size: 12.5px;
+}
+
+.signedRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--v-success);
+}
+
+/* seal card */
+
+.sealWrap {
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+}
+
+.seal {
+  width: 64px;
+  height: 64px;
+}
+
+.sealRing {
+  stroke-dasharray: 176;
+  stroke-dashoffset: 176;
+  animation: draw 420ms var(--ease-enter) 300ms forwards;
+}
+
+.sealCheck {
+  stroke-dasharray: 36;
+  stroke-dashoffset: 36;
+  animation: draw 300ms var(--ease-enter) 640ms forwards;
+}
+
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+
+.sealText {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--v-text);
+}
+
+.sealMeta {
+  font-size: 11px;
+  color: var(--v-muted);
+  margin-top: 4px;
+}
+
+/* ---------- center ---------- */
+
+.center {
+  text-align: center;
+  max-width: 720px;
+  z-index: 3;
+  will-change: transform;
+}
+
+.headline {
+  font-size: clamp(44px, 7.2vw, 84px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+  color: var(--v-text);
+}
+
+.headlineAccent {
+  background: linear-gradient(100deg, var(--v-action) 20%, #a78bfa 60%, var(--v-signature) 115%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.sub {
+  margin: 24px auto 0;
+  max-width: 480px;
+  font-size: 16.5px;
+  color: var(--v-text-2);
+  line-height: 1.6;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 32px;
+  flex-wrap: wrap;
+}
+
+.primary,
+.ghost {
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 14px 28px;
+  border-radius: 10px;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform var(--motion-instant) var(--ease-standard),
+    background var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+
+.primary {
+  background: var(--v-action);
+  color: var(--v-on-action);
+  border: 1px solid transparent;
+}
+
+.primary:hover {
+  background: var(--v-action-hover);
+}
+
+.primary:active,
+.ghost:active {
+  transform: scale(0.985);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--v-text);
+  border: 1px solid var(--v-border-strong);
+}
+
+.ghost:hover {
+  border-color: var(--v-text-2);
+}
+
+.truthRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 32px;
+  font-size: 12.5px;
+  color: var(--v-muted);
+  flex-wrap: wrap;
+}
+
+.truthSep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--v-border-strong);
+}
+
+/* ---------- mobile: native stacking, no tilt ---------- */
+
+@media (max-width: 900px) {
+  .stage {
+    perspective: none;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 24px 20px 48px;
+  }
+
+  .card {
+    position: static;
+    margin: 0 !important;
+    animation: none;
+    transform: none !important;
+    width: 100%;
+    max-width: 340px;
+  }
+
+  .center {
+    order: -1;
+  }
+
+  .cardA {
+    max-width: 340px;
+  }
+
+  .cardB {
+    display: none; /* the seal is earned on the receipt, not decoration on phones */
+  }
+
+  .header {
+    padding: 20px;
+  }
+}
