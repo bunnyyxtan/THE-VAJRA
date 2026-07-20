@@ -234,10 +234,19 @@ export function isWebAuthnAvailable(): boolean {
 }
 
 /**
+ * Hard cap on the ceremony wait. Some mobile wallet in-app browsers (e.g.
+ * MetaMask mobile) expose navigator.credentials.create but their platform
+ * authenticator never responds, leaving the promise pending forever — the
+ * race below guarantees the user is never stuck.
+ */
+const CEREMONY_TIMEOUT_MS = 45_000;
+
+/**
  * Runs the real WebAuthn registration ceremony and returns the onchain
  * registration material. Throws VajraError WALLET_UNAVAILABLE when WebAuthn
- * is unsupported, WALLET_REJECTED when the user declines, PAYLOAD_INVALID
- * when the authenticator returns something malformed.
+ * is unsupported or the ceremony never responds, WALLET_REJECTED when the
+ * user declines, PAYLOAD_INVALID when the authenticator returns something
+ * malformed.
  */
 export async function createPasskeyCredential(owner: Address): Promise<RegisteredPasskeyMaterial> {
   if (!isWebAuthnAvailable()) {
@@ -252,26 +261,40 @@ export async function createPasskeyCredential(owner: Address): Promise<Registere
   const userId = new TextEncoder().encode(owner.toLowerCase());
 
   let credential: Credential | null;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
-    credential = await navigator.credentials.create({
-      publicKey: {
-        challenge: challenge as unknown as BufferSource,
-        rp: { name: 'Vajra', id: window.location.hostname },
-        user: {
-          id: userId as unknown as BufferSource,
-          name: owner.toLowerCase(),
-          displayName: 'Vajra Touch',
+    credential = await Promise.race([
+      navigator.credentials.create({
+        publicKey: {
+          challenge: challenge as unknown as BufferSource,
+          rp: { name: 'Vajra', id: window.location.hostname },
+          user: {
+            id: userId as unknown as BufferSource,
+            name: owner.toLowerCase(),
+            displayName: 'Vajra Touch',
+          },
+          pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+          authenticatorSelection: {
+            userVerification: 'required',
+            residentKey: 'preferred',
+          },
+          attestation: 'none',
+          timeout: 60_000,
         },
-        pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
-        authenticatorSelection: {
-          userVerification: 'required',
-          residentKey: 'preferred',
-        },
-        attestation: 'none',
-        timeout: 60_000,
-      },
-    });
+      }),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(
+            new VajraError(
+              'WALLET_UNAVAILABLE',
+              'The passkey ceremony did not respond — this browser cannot create passkeys.',
+            ),
+          );
+        }, CEREMONY_TIMEOUT_MS);
+      }),
+    ]);
   } catch (err) {
+    if (err instanceof VajraError) throw err;
     const name = (err as { name?: unknown })?.name;
     if (name === 'NotAllowedError') {
       throw new VajraError('WALLET_REJECTED', 'The passkey ceremony was declined or timed out.', err);
@@ -284,6 +307,8 @@ export async function createPasskeyCredential(owner: Address): Promise<Registere
       );
     }
     throw new VajraError('UNKNOWN', 'The passkey ceremony failed unexpectedly.', err);
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
   }
 
   if (!credential || credential.type !== 'public-key') {

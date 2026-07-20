@@ -68,7 +68,7 @@ const validateAmount = (raw: string): string | null => {
 
 export default function CreateRequest() {
   const router = useRouter();
-  const { passkey, wallet, setWallet, addRequest } = useVajra();
+  const { hydrated, passkey, setPasskey, wallet, setWallet, addRequest } = useVajra();
   const reduceMotion = useMotionPref();
   const { isDesktop } = useBreakpoint();
 
@@ -587,7 +587,7 @@ export default function CreateRequest() {
             </Animated.View>
           ) : null}
 
-          {!passkey && phase === "review" ? (
+          {hydrated && !passkey && phase === "review" ? (
             <Animated.View
               entering={reduceMotion ? undefined : FadeInDown.duration(300)}
               style={styles.passkeyNudge}
@@ -598,6 +598,28 @@ export default function CreateRequest() {
                 <Text style={styles.nudgeBody}>
                   Set it up once. After that, locking terms takes one touch.
                 </Text>
+                <PressableScale
+                  testID="create-nudge-wallet-signature"
+                  accessibilityLabel="Use wallet signature instead"
+                  onPress={() => {
+                    // Real local preference, not a fake passkey: choosing this
+                    // registers wallet-signature as the auth method and
+                    // permanently dismisses the nudge.
+                    setPasskey({
+                      name: "Wallet signature",
+                      device: "This device",
+                      createdAt: new Date().toISOString(),
+                      method: "wallet-signature",
+                    });
+                    triggerHaptic("success");
+                  }}
+                  style={styles.nudgeAlt}
+                  haptic={null}
+                >
+                  <Text style={styles.nudgeAltText}>
+                    Use wallet signature instead
+                  </Text>
+                </PressableScale>
               </View>
               <Button
                 label="Set up"
@@ -1053,5 +1075,12 @@ const styles = StyleSheet.create({
     color: C.onLavender,
     opacity: 0.85,
     marginTop: 2,
+  },
+  nudgeAlt: { alignSelf: "flex-start", paddingVertical: 6, marginTop: 2 },
+  nudgeAltText: {
+    fontFamily: F.semi,
+    fontSize: 12,
+    color: C.onLavender,
+    textDecorationLine: "underline",
   },
 });

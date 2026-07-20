@@ -248,9 +248,8 @@ export default function PasskeySetup() {
         testID="passkey-unsupported-sheet"
       >
         <Text style={styles.sheetBody}>
-          Some devices can’t create passkeys. You can authenticate your payment
-          terms with a wallet signature instead. The protection for people
-          paying you is identical.
+          This browser can’t create passkeys — use wallet signature instead,
+          it secures requests the same way.
         </Text>
         <Text style={[styles.sheetBody, { color: C.inkFaint, fontSize: 12 }]}>
           Vajra will never ask for your seed phrase or private key.
