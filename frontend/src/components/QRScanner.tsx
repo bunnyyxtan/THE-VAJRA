@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import React, { useRef, useState } from "react";
+import * as Clipboard from "expo-clipboard";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Linking,
   Modal,
@@ -69,16 +70,7 @@ export default function QRScannerModal({ visible, onClose, onCode }: Props) {
 
   const renderBody = () => {
     if (Platform.OS === "web") {
-      return (
-        <InfoPanel
-          icon="desktop-outline"
-          title="Scanning needs the mobile app"
-          body="Camera scanning is available on iOS and Android. On the web preview, paste the Vajra link instead."
-          actionLabel="Paste a link instead"
-          onAction={onClose}
-          testID="scanner-web-fallback"
-        />
-      );
+      return <WebScannerBody onCode={onCode} />;
     }
     if (!permission) {
       return (
@@ -180,6 +172,227 @@ export default function QRScannerModal({ visible, onClose, onCode }: Props) {
   );
 }
 
+type WebBarcode = { rawValue: string };
+type BarcodeDetectorInstance = {
+  detect: (source: HTMLVideoElement) => Promise<WebBarcode[]>;
+};
+type BarcodeDetectorCtor = new (options?: {
+  formats?: string[];
+}) => BarcodeDetectorInstance;
+
+type WebCamState = "starting" | "active" | "fallback";
+
+/**
+ * Web scanner body: tries getUserMedia + BarcodeDetector first, and falls back
+ * to a paste action (real validation through onCode) when the camera or the
+ * detector is unavailable in this browser.
+ */
+function WebScannerBody({ onCode }: { onCode: (code: string) => boolean }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [camState, setCamState] = useState<WebCamState>("starting");
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [pasteError, setPasteError] = useState<string | null>(null);
+  const [pasting, setPasting] = useState(false);
+  const lastScan = useRef(0);
+  const errTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleDetected = useCallback(
+    (raw: string) => {
+      const now = Date.now();
+      if (now - lastScan.current < 1500) return;
+      lastScan.current = now;
+      const code = extractCode(raw);
+      if (!code) {
+        setScanError("This is not a Vajra request QR. Keep the code inside the frame.");
+      } else if (!onCode(code)) {
+        setScanError("No request found for this code. Ask the sender to check it.");
+      } else {
+        triggerHaptic("success");
+        return;
+      }
+      triggerHaptic("error");
+      if (errTimer.current) clearTimeout(errTimer.current);
+      errTimer.current = setTimeout(() => setScanError(null), 2400);
+    },
+    [onCode],
+  );
+
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
+    let cancelled = false;
+
+    const start = async () => {
+      const Detector = (
+        window as unknown as { BarcodeDetector?: BarcodeDetectorCtor }
+      ).BarcodeDetector;
+      if (!Detector || !navigator.mediaDevices?.getUserMedia) {
+        setCamState("fallback");
+        return;
+      }
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+          audio: false,
+        });
+      } catch {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+        } catch {
+          if (!cancelled) setCamState("fallback");
+          return;
+        }
+      }
+      if (cancelled) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      const video = videoRef.current;
+      if (!video) {
+        stream.getTracks().forEach((t) => t.stop());
+        setCamState("fallback");
+        return;
+      }
+      video.srcObject = stream;
+      try {
+        await video.play();
+      } catch {
+        // Autoplay can be rejected until first frames arrive; detection still works.
+      }
+      let detector: BarcodeDetectorInstance;
+      try {
+        detector = new Detector({ formats: ["qr_code"] });
+      } catch {
+        try {
+          detector = new Detector();
+        } catch {
+          stream.getTracks().forEach((t) => t.stop());
+          if (!cancelled) setCamState("fallback");
+          return;
+        }
+      }
+      if (cancelled) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      setCamState("active");
+      interval = setInterval(() => {
+        if (!video || video.readyState < 2) return;
+        detector
+          .detect(video)
+          .then((codes) => {
+            const raw = codes && codes.length > 0 ? codes[0].rawValue : null;
+            if (raw) handleDetected(raw);
+          })
+          .catch(() => {});
+      }, 500);
+    };
+
+    start().catch(() => {
+      if (!cancelled) setCamState("fallback");
+    });
+
+    return () => {
+      cancelled = true;
+      if (interval) clearInterval(interval);
+      if (errTimer.current) clearTimeout(errTimer.current);
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      if (videoRef.current) videoRef.current.srcObject = null;
+    };
+  }, [handleDetected]);
+
+  const pasteLink = async () => {
+    setPasting(true);
+    setPasteError(null);
+    try {
+      const text = (await Clipboard.getStringAsync()).trim();
+      if (!text) {
+        setPasteError("Clipboard is empty. Copy the Vajra link first, then paste it here.");
+        return;
+      }
+      // Pass the pasted text through onCode so open-link validates it for real.
+      onCode(text);
+    } catch {
+      setPasteError(
+        "This browser blocked clipboard access. Close this and paste the link into the input instead.",
+      );
+    } finally {
+      setPasting(false);
+    }
+  };
+
+  if (camState === "starting") {
+    return (
+      <InfoPanel
+        icon="camera-outline"
+        title="Checking camera access"
+        body="One moment."
+        testID="scanner-web-loading"
+      />
+    );
+  }
+
+  if (camState === "fallback") {
+    return (
+      <InfoPanel
+        icon="camera-outline"
+        title="No camera here"
+        body="Scanning needs a camera this browser can't reach. Paste the link instead — requests verify the same way."
+        actionLabel="Paste link"
+        onAction={pasteLink}
+        actionLoading={pasting}
+        actionLoadingLabel="Reading clipboard"
+        error={pasteError}
+        testID="scanner-web-fallback"
+      />
+    );
+  }
+
+  return (
+    <View style={styles.fill}>
+      {React.createElement("video", {
+        ref: videoRef,
+        playsInline: true,
+        muted: true,
+        autoPlay: true,
+        style: {
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+        } as React.CSSProperties,
+      })}
+      {/* framing overlay */}
+      <View style={styles.overlay} pointerEvents="none">
+        <View style={styles.frame}>
+          <View style={[styles.corner, styles.tl]} />
+          <View style={[styles.corner, styles.tr]} />
+          <View style={[styles.corner, styles.bl]} />
+          <View style={[styles.corner, styles.br]} />
+        </View>
+      </View>
+      <View style={styles.caption} accessibilityLiveRegion="polite">
+        {scanError ? (
+          <Text style={styles.captionError} testID="scanner-web-error">
+            {scanError}
+          </Text>
+        ) : (
+          <Text style={styles.captionText}>
+            Point at a Vajra QR. Verification starts before any payment.
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
 function InfoPanel({
   icon,
   title,
@@ -187,8 +400,10 @@ function InfoPanel({
   actionLabel,
   onAction,
   actionLoading,
+  actionLoadingLabel,
   secondaryLabel,
   onSecondary,
+  error,
   testID,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
@@ -197,8 +412,10 @@ function InfoPanel({
   actionLabel?: string;
   onAction?: () => void;
   actionLoading?: boolean;
+  actionLoadingLabel?: string;
   secondaryLabel?: string;
   onSecondary?: () => void;
+  error?: string | null;
   testID?: string;
 }) {
   return (
@@ -213,7 +430,7 @@ function InfoPanel({
           label={actionLabel}
           onPress={onAction}
           loading={actionLoading}
-          loadingLabel="Requesting"
+          loadingLabel={actionLoadingLabel ?? "Requesting"}
           style={styles.infoAction}
           testID={testID ? `${testID}-action` : undefined}
         />
@@ -228,6 +445,15 @@ function InfoPanel({
         >
           <Text style={styles.infoSecondaryText}>{secondaryLabel}</Text>
         </PressableScale>
+      ) : null}
+      {error ? (
+        <Text
+          style={styles.infoError}
+          testID={testID ? `${testID}-error` : undefined}
+          accessibilityLiveRegion="polite"
+        >
+          {error}
+        </Text>
       ) : null}
     </View>
   );
@@ -340,4 +566,18 @@ const styles = StyleSheet.create({
   infoAction: { alignSelf: "stretch", marginTop: S.xl },
   infoSecondary: { padding: S.md, marginTop: S.xs },
   infoSecondaryText: { fontFamily: F.semi, fontSize: 13.5, color: C.lavender },
+  infoError: {
+    fontFamily: F.semi,
+    fontSize: 13,
+    lineHeight: 18,
+    color: C.onInverse,
+    textAlign: "center",
+    backgroundColor: C.error,
+    borderRadius: R.md,
+    paddingHorizontal: S.lg,
+    paddingVertical: S.md,
+    overflow: "hidden",
+    marginTop: S.lg,
+    maxWidth: 320,
+  },
 });
