@@ -119,7 +119,11 @@ export default function Screen({
               <PressableScale
                 testID="header-back-button"
                 accessibilityLabel="Go back"
-                onPress={onBack || (() => router.back())}
+                onPress={
+                  onBack ||
+                  (() =>
+                    router.canGoBack() ? router.back() : router.replace("/"))
+                }
                 style={styles.backBtn}
                 haptic={null}
               >

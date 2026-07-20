@@ -12,6 +12,19 @@ atomically onchain; every later attempt reverts at contract level.
 No custody. No admin keys. No backend. The contract holds no balances — a
 successful payment moves native MON directly to the signed recipient.
 
+## App preview
+
+**Desktop**
+
+![Vajra home — recipient-authenticated payments on Monad Mainnet](docs/screenshots/home.png)
+![Create a signed payment request](docs/screenshots/create.png)
+![Pay a request — verify terms before connecting a wallet](docs/screenshots/pay-entry.png)
+
+**Mobile**
+
+![Vajra home on mobile](docs/screenshots/home-mobile.png)
+![Create a signed payment request on mobile](docs/screenshots/create-mobile.png)
+
 ## Live deployment
 
 | | |
