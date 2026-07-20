@@ -107,8 +107,6 @@ deterministic *previews* of every request state and is labeled as such.
 - **Honest UI** — success requires receipt + event + state. Optimistic UI is
   forbidden on anything that moves funds.
 
-Full threat model, invariants, and test strategy: `Vajra_PRD_TRD_Security_Blueprint.pdf`.
-
 ## Testing
 
 | Suite | Count | Result |
