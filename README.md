@@ -14,16 +14,20 @@ successful payment moves native MON directly to the signed recipient.
 
 ## App preview
 
-**Desktop**
-
 ![Vajra home — recipient-authenticated payments on Monad Mainnet](docs/screenshots/home.png)
-![Create a signed payment request](docs/screenshots/create.png)
-![Pay a request — verify terms before connecting a wallet](docs/screenshots/pay-entry.png)
 
-**Mobile**
+<table>
+  <tr>
+    <td><img src="docs/screenshots/create.png" alt="Create a signed payment request — amount, terms, wallet signature" /></td>
+    <td><img src="docs/screenshots/pay-entry.png" alt="Pay a request — every term verifiable before connecting a wallet" /></td>
+  </tr>
+</table>
 
-![Vajra home on mobile](docs/screenshots/home-mobile.png)
-![Create a signed payment request on mobile](docs/screenshots/create-mobile.png)
+<p align="center">
+  <img src="docs/screenshots/home-mobile.png" width="260" alt="Vajra home on mobile — signed request card and one-touch setup" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/create-mobile.png" width="260" alt="Create a signed payment request on mobile" />
+</p>
 
 ## Live deployment
 
