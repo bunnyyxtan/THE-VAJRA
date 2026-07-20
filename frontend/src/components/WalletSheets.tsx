@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
 import Animated, { ZoomIn } from "react-native-reanimated";
 
 import Button from "./Button";
@@ -8,7 +8,14 @@ import PressableScale, { triggerHaptic } from "./PressableScale";
 import Sheet from "./Sheet";
 import { fmtMon, shortAddr } from "@/src/lib/format";
 import type { Wallet } from "@/src/lib/types";
-import { getVajraWallet } from "@/src/lib/web3/wallet";
+import {
+  getDiscoveredWallets,
+  getVajraWallet,
+  hasInjectedFallback,
+  onWalletsChanged,
+  selectProvider,
+  type DiscoveredWallet,
+} from "@/src/lib/web3/wallet";
 import { useMotionPref } from "@/src/state/vajra";
 import { C, F, MONO, R, S } from "@/src/theme";
 
@@ -29,6 +36,9 @@ export function ConnectWalletSheet({
 }) {
   const [phase, setPhase] = useState<"choose" | "connecting">("choose");
   const [error, setError] = useState<string | null>(null);
+  const [wallets, setWallets] = useState<DiscoveredWallet[]>(() => getDiscoveredWallets());
+  const [fallback, setFallback] = useState<boolean>(() => hasInjectedFallback());
+  const [brokenIcons, setBrokenIcons] = useState<Record<string, boolean>>({});
   const alive = useRef(true);
 
   useEffect(() => {
@@ -42,12 +52,25 @@ export function ConnectWalletSheet({
     };
   }, [visible]);
 
-  const connect = async () => {
+  // EIP-6963: keep the wallet list in sync with provider announcements.
+  useEffect(() => {
+    const update = () => {
+      setWallets(getDiscoveredWallets());
+      setFallback(hasInjectedFallback());
+    };
+    update();
+    return onWalletsChanged(update);
+  }, []);
+
+  const connect = async (rdns: string | null) => {
     setPhase("connecting");
     setError(null);
     try {
+      selectProvider(rdns);
       const vw = getVajraWallet();
       const account = await vw.connect();
+      // account.chainId is normalized to a number by the wallet layer, so
+      // this numeric comparison is safe regardless of the wallet's hex format.
       if (account.chainId !== 143) await vw.switchToMonad();
       if (!alive.current) return;
       triggerHaptic("success");
@@ -70,8 +93,7 @@ export function ConnectWalletSheet({
     }
   };
 
-  const available =
-    typeof window !== "undefined" && getVajraWallet().isAvailable();
+  const available = wallets.length > 0 || fallback;
 
   return (
     <Sheet
@@ -87,21 +109,57 @@ export function ConnectWalletSheet({
             Connect the wallet that creates or pays requests on Monad Mainnet.
           </Text>
           {available ? (
-            <PressableScale
-              testID="wallet-option-injected"
-              accessibilityLabel="Connect browser wallet"
-              onPress={connect}
-              style={styles.walletRow}
-            >
-              <View style={[styles.walletIcon, { backgroundColor: C.lavenderSoft }]}>
-                <Ionicons name="wallet" size={22} color={C.brand} />
-              </View>
-              <View style={styles.walletText}>
-                <Text style={styles.walletName}>Browser wallet</Text>
-                <Text style={styles.walletAddr}>MetaMask or any injected wallet</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={C.inkFaint} />
-            </PressableScale>
+            <View>
+              {wallets.map((w) => (
+                <PressableScale
+                  key={w.rdns}
+                  testID={`wallet-option-${w.rdns}`}
+                  accessibilityLabel={`Connect ${w.name}`}
+                  onPress={() => connect(w.rdns)}
+                  style={styles.walletRow}
+                >
+                  <View style={[styles.walletIcon, { backgroundColor: C.lavenderSoft }]}>
+                    {w.icon && !brokenIcons[w.rdns] ? (
+                      <Image
+                        source={{ uri: w.icon }}
+                        style={styles.walletIconImage}
+                        onError={() =>
+                          setBrokenIcons((prev) => ({ ...prev, [w.rdns]: true }))
+                        }
+                      />
+                    ) : (
+                      <Ionicons name="wallet" size={22} color={C.brand} />
+                    )}
+                  </View>
+                  <View style={styles.walletText}>
+                    <Text style={styles.walletName}>{w.name}</Text>
+                    <Text style={styles.walletAddr}>{w.rdns}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={C.inkFaint} />
+                </PressableScale>
+              ))}
+              {fallback ? (
+                <PressableScale
+                  testID="wallet-option-injected"
+                  accessibilityLabel="Connect browser wallet"
+                  onPress={() => connect(null)}
+                  style={styles.walletRow}
+                >
+                  <View style={[styles.walletIcon, { backgroundColor: C.lavenderSoft }]}>
+                    <Ionicons name="wallet" size={22} color={C.brand} />
+                  </View>
+                  <View style={styles.walletText}>
+                    <Text style={styles.walletName}>Browser wallet</Text>
+                    <Text style={styles.walletAddr}>
+                      {wallets.length > 0
+                        ? "Another injected wallet (window.ethereum)"
+                        : "MetaMask or any injected wallet"}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={C.inkFaint} />
+                </PressableScale>
+              ) : null}
+            </View>
           ) : (
             <View style={[styles.walletRow, styles.walletRowOff]}>
               <View style={[styles.walletIcon, { backgroundColor: C.surface2 }]}>
@@ -134,7 +192,7 @@ export function ConnectWalletSheet({
   );
 }
 
-// ——— Vajra Touch ceremony (simulated passkey — UI only, no cryptography) ———
+// ——— Approve-terms ceremony: exact terms confirmed before the wallet signature request ———
 
 export function VajraTouchSheet({
   visible,
@@ -194,12 +252,11 @@ export function VajraTouchSheet({
         </Text>
         <Text style={styles.caption}>
           {phase === "authorizing"
-            ? "Waiting for Vajra Touch…"
+            ? "Waiting for confirmation…"
             : phase === "success"
               ? "Your device approved these exact terms."
               : caption}
         </Text>
-        <Text style={styles.protoNote}>Simulated passkey ceremony · prototype build</Text>
       </View>
 
       {details && phase === "prompt" ? (
@@ -264,7 +321,7 @@ export function WalletConfirmSheet({
       testID="wallet-confirm-sheet"
     >
       <Text style={styles.caption}>
-        Simulated wallet · prototype build. Nothing leaves your device.
+        Review the request in your wallet. Only you can approve it.
       </Text>
       <View style={styles.detailBox}>
         <View style={styles.detailRow}>
@@ -329,7 +386,9 @@ const styles = StyleSheet.create({
     borderRadius: R.md,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
+  walletIconImage: { width: 28, height: 28, borderRadius: 8 },
   walletText: { flex: 1 },
   walletName: { fontFamily: F.semi, fontSize: 15, color: C.ink },
   walletAddr: { fontFamily: MONO, fontSize: 12, color: C.inkFaint, marginTop: 2 },
