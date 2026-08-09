@@ -4,7 +4,7 @@
 
 Vajra consists of:
 
-- `VajraNativeV1` — an immutable settlement contract deployed on Monad Mainnet
+- `VajraNativeV1`, an immutable settlement contract deployed on Monad Mainnet
   (chain ID 143) at `0x7d17f2765bb58ceb27b9e1e52b068c72ccb8299f`
 - A client-side web application (this repository's `frontend/`) that constructs,
   verifies, and settles payment requests.
@@ -23,7 +23,7 @@ The contract enforces, and the test suite proves:
 - A failed native transfer reverts the entire transaction and leaves the
   request unused.
 - No privileged account can alter a request, redirect a payment, or recover
-  funds — there is no owner, no upgrade path, no pause, no admin withdrawal.
+  funds: there is no owner, no upgrade path, no pause, no admin withdrawal.
 
 ## What we do not claim
 
