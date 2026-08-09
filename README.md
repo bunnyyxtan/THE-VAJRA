@@ -3,7 +3,7 @@
 **Verified payments on Monad.** Signed by them. Final on Monad.
 
 <p>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2f3542.svg" alt="MIT license" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-source--available-2f3542.svg" alt="Source available license" /></a>
   <img src="https://img.shields.io/badge/network-Monad%20Mainnet%20(143)-6e54ff" alt="Monad Mainnet" />
   <a href="https://monadscan.com/address/0x7d17f2765bb58ceb27b9e1e52b068c72ccb8299f"><img src="https://img.shields.io/badge/verification-Sourcify%20full%20match-2ea44f" alt="Sourcify verified" /></a>
   <img src="https://img.shields.io/badge/contracts-Solidity-363636" alt="Solidity" />
@@ -127,4 +127,4 @@ deterministic *previews* of every request state and is labeled as such.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Source available. Read and audit freely. Using, copying, modifying, or hosting the code requires written permission. See [LICENSE](LICENSE).
